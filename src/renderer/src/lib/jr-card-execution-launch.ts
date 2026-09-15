@@ -32,6 +32,8 @@ type JrExecutionLaunchDependencies = {
     agent: JrRecordAgentSessionInput['agent']
     worktreeId: string
     prompt: string
+    sessionOptions: { model: string }
+    sessionOptionsOverrideAgentArgs: boolean
     title: string
     onAgentStatus: (status: JrAgentLifecycleState) => void
     onExit: (code: number) => void
@@ -93,6 +95,8 @@ export function createJrCardExecutionLauncher(dependencies: JrExecutionLaunchDep
           agent,
           worktreeId: worktree.id,
           prompt: request.prompt,
+          sessionOptions: { model: request.model.id },
+          sessionOptionsOverrideAgentArgs: true,
           title: `JR · ${request.title}`,
           onAgentStatus: (status) =>
             reportJrLifecycle(

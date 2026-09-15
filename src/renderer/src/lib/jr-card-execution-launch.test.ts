@@ -74,6 +74,8 @@ describe('JR card execution launch', () => {
         agent: 'cursor',
         worktreeId: 'repo-1::/worktree',
         prompt: 'DB-backed Trellis prompt',
+        sessionOptions: { model: 'auto' },
+        sessionOptionsOverrideAgentArgs: true,
         title: 'JR · Launch JR task'
       })
     )
