@@ -155,15 +155,13 @@ export default function JrBoardDrawer({
   }
 
   const handleModelChange = (modelId: string): void => {
-    if (!selectedCard?.harness) {
+    const card = selectedCard
+    const harness = card?.harness
+    if (!card || !harness) {
       return
     }
     void runAction(() =>
-      window.api.jr.updateCardConfiguration(
-        selectedCard.id,
-        { harness: selectedCard.harness, modelId },
-        LOCAL_CONTROLLER
-      )
+      window.api.jr.updateCardConfiguration(card.id, { harness, modelId }, LOCAL_CONTROLLER)
     )
   }
 
