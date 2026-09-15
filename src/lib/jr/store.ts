@@ -39,9 +39,7 @@ type EventRow = {
 const dbPath = process.env.JR_DB_PATH ?? join(process.cwd(), ".jr", "jr.sqlite");
 
 declare global {
-  // eslint-disable-next-line no-var
   var jrDatabase: DatabaseSync | undefined;
-  // eslint-disable-next-line no-var
   var jrDatabaseInitialized: boolean | undefined;
 }
 

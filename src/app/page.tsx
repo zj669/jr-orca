@@ -94,7 +94,29 @@ export default function Home() {
   };
 
   useEffect(() => {
-    void refresh();
+    let cancelled = false;
+
+    async function loadInitialBoard() {
+      try {
+        const response = await fetch("/api/board", { cache: "no-store" });
+        const payload: unknown = await response.json();
+        if (!response.ok) throw new Error(getError(payload));
+        if (!cancelled) setBoard(payload as BoardData);
+      } catch (error) {
+        if (!cancelled) {
+          setLoadError(
+            error instanceof Error ? error.message : "无法读取 JR 看板。",
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void loadInitialBoard();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const selected = useMemo(
