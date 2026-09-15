@@ -1,7 +1,8 @@
 {
-  "name": "tmp-scaffold",
+  "name": "jr-delivery-board",
   "version": "0.1.0",
   "private": true,
+  "description": "Database-first Trellis task board with Git worktree execution",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
