@@ -115,7 +115,11 @@ export type JrExecutionLaunchRequest = {
   title: string
   harness: JrHarness
   model: JrModelChoice
-  execution: Required<JrExecutionTarget>
+  execution: {
+    repositoryId: string
+    baseRef: string
+    setupDecision: JrExecutionTarget['setupDecision']
+  }
   prompt: string
 }
 

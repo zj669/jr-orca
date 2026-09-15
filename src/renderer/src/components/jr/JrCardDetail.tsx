@@ -79,11 +79,12 @@ export function JrCardDetail({
     )
   }
   const handleModelChange = (modelId: string): void => {
-    if (!card.harness) {
+    const harness = card.harness
+    if (!harness) {
       return
     }
     runAction(() =>
-      window.api.jr.updateCardConfiguration(card.id, { harness: card.harness, modelId }, controller)
+      window.api.jr.updateCardConfiguration(card.id, { harness, modelId }, controller)
     )
   }
   const handleRepositoryChange = (repositoryId: string): void => {
