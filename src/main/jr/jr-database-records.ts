@@ -26,9 +26,13 @@ export function optionalJrDatabaseString(row: JrDatabaseRow, key: string): strin
   return typeof value === 'string' ? value : null
 }
 
+function isJrCardStatus(value: string): value is JrCardStatus {
+  return JR_CARD_STATUSES.some((candidate) => candidate === value)
+}
+
 export function requireJrDatabaseCardStatus(row: JrDatabaseRow): JrCardStatus {
   const status = requireJrDatabaseString(row, 'status')
-  if (!JR_CARD_STATUSES.some((candidate) => candidate === status)) {
+  if (!isJrCardStatus(status)) {
     throw new Error(`JR database has an unknown status: ${status}.`)
   }
   return status
