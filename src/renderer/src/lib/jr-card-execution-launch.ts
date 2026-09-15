@@ -29,7 +29,7 @@ type JrExecutionLaunchDependencies = {
   prepareExecution: (cardId: string, actor: JrControllerActor) => Promise<JrExecutionLaunchRequest>
   createWorktree: (request: JrNativeWorktreeRequest) => Promise<JrRecordWorktreeInput>
   launchAgent: (request: {
-    agent: TuiAgent
+    agent: JrRecordAgentSessionInput['agent']
     worktreeId: string
     prompt: string
     title: string
