@@ -41,11 +41,11 @@ describe('JrStore', () => {
 
     const configured = store.updateCardConfiguration(
       card.id,
-      { harness: 'codex', modelId: 'default' },
+      { harness: 'codex', modelId: 'gpt-5.6-sol' },
       controller
     )
     expect(configured.harness).toBe('codex')
-    expect(configured.model?.id).toBe('default')
+    expect(configured.model?.id).toBe('gpt-5.6-sol')
     const targeted = store.updateCardExecutionTarget(
       card.id,
       { repositoryId: 'repo-1', baseRef: 'main', setupDecision: 'run' },
@@ -93,7 +93,11 @@ describe('JrStore', () => {
     const store = new JrStore(databasePath)
     stores.push(store)
     const card = store.createCard({ title: 'Persist artifacts' }, controller)
-    store.updateCardConfiguration(card.id, { harness: 'gemini', modelId: 'default' }, controller)
+    store.updateCardConfiguration(
+      card.id,
+      { harness: 'gemini', modelId: 'gemini-3-pro-preview' },
+      controller
+    )
     store.updateCardExecutionTarget(
       card.id,
       { repositoryId: 'repo-1', baseRef: 'main', setupDecision: 'inherit' },
@@ -110,7 +114,7 @@ describe('JrStore', () => {
 
     expect(restored).toMatchObject({
       harness: 'gemini',
-      model: { id: 'default' },
+      model: { id: 'gemini-3-pro-preview' },
       status: 'planning'
     })
     expect(restored?.artifacts.map((artifact) => artifact.path)).toEqual(
@@ -126,7 +130,7 @@ describe('JrStore', () => {
   it('persists the approved execution handoff and blocks only after Orca reports a failure', async () => {
     const store = await createStore()
     const card = store.createCard({ title: 'Create a real worktree' }, controller)
-    store.updateCardConfiguration(card.id, { harness: 'cursorcli', modelId: 'default' }, controller)
+    store.updateCardConfiguration(card.id, { harness: 'cursorcli', modelId: 'auto' }, controller)
     store.updateCardExecutionTarget(
       card.id,
       { repositoryId: 'repo-orca', baseRef: 'main', setupDecision: 'skip' },
@@ -196,7 +200,7 @@ describe('JrStore', () => {
   it('requires a persisted execution target before controller approval', async () => {
     const store = await createStore()
     const card = store.createCard({ title: 'Missing execution target' }, controller)
-    store.updateCardConfiguration(card.id, { harness: 'claude', modelId: 'default' }, controller)
+    store.updateCardConfiguration(card.id, { harness: 'claude', modelId: 'sonnet' }, controller)
     store.transition(card.id, 'begin-discussion', controller)
     store.transition(card.id, 'begin-planning', controller)
 

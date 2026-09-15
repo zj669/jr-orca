@@ -77,7 +77,7 @@ describe('JR IPC', () => {
       'jr:updateCardConfiguration',
       undefined,
       card.id,
-      { harness: 'claude', modelId: 'default' },
+      { harness: 'claude', modelId: 'sonnet' },
       { kind: 'human-controller', id: 'walker' }
     )
     await invoke('jr:transitionCard', undefined, card.id, 'begin-discussion', {
@@ -114,7 +114,7 @@ describe('JR IPC', () => {
     expect(persisted).toMatchObject({
       status: 'pending_execution_approval',
       harness: 'claude',
-      model: { id: 'default' }
+      model: { id: 'sonnet' }
     })
     expect(persisted?.artifacts.map((artifact) => artifact.path)).toEqual(
       expect.arrayContaining([
@@ -139,7 +139,7 @@ describe('JR IPC', () => {
     )
     store.updateCardConfiguration(
       card.id,
-      { harness: 'codex', modelId: 'default' },
+      { harness: 'codex', modelId: 'gpt-5.6-sol' },
       {
         kind: 'human-controller',
         id: 'walker'

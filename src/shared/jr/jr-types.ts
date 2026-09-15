@@ -1,3 +1,5 @@
+import { getAgentSessionOptionCatalog } from '../agent-session-option-catalog'
+
 export const JR_HARNESSES = ['cursorcli', 'claude', 'codex', 'gemini'] as const
 export type JrHarness = (typeof JR_HARNESSES)[number]
 
@@ -20,7 +22,7 @@ export type JrCardStatus = (typeof JR_CARD_STATUSES)[number]
 export type JrModelChoice = {
   id: string
   label: string
-  capabilitySource: 'orca-default'
+  capabilitySource: 'orca-session-catalog'
 }
 
 export type JrExecutionTarget = {
@@ -140,22 +142,22 @@ export const JR_HARNESS_CATALOG: JrBoardSnapshot['harnesses'] = [
   {
     id: 'cursorcli',
     label: 'Cursor CLI',
-    models: [{ id: 'default', label: 'Orca 默认模型', capabilitySource: 'orca-default' }]
+    models: jrHarnessModels('cursor')
   },
   {
     id: 'claude',
     label: 'Claude Code',
-    models: [{ id: 'default', label: 'Orca 默认模型', capabilitySource: 'orca-default' }]
+    models: jrHarnessModels('claude')
   },
   {
     id: 'codex',
     label: 'Codex',
-    models: [{ id: 'default', label: 'Orca 默认模型', capabilitySource: 'orca-default' }]
+    models: jrHarnessModels('codex')
   },
   {
     id: 'gemini',
     label: 'Gemini',
-    models: [{ id: 'default', label: 'Orca 默认模型', capabilitySource: 'orca-default' }]
+    models: jrHarnessModels('gemini')
   }
 ]
 
@@ -165,4 +167,15 @@ export function isJrHarness(value: unknown): value is JrHarness {
 
 export function isJrCardTransition(value: unknown): value is JrCardTransition {
   return typeof value === 'string' && JR_CARD_TRANSITIONS.some((transition) => transition === value)
+}
+
+function jrHarnessModels(agent: 'cursor' | 'claude' | 'codex' | 'gemini'): JrModelChoice[] {
+  const catalog = getAgentSessionOptionCatalog(agent)
+  return (
+    catalog?.models.map((model) => ({
+      id: model.id,
+      label: model.label,
+      capabilitySource: 'orca-session-catalog'
+    })) ?? []
+  )
 }

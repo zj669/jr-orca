@@ -41,7 +41,7 @@ export function readJrCard(db: SyncDatabase, row: JrDatabaseRow): JrCard {
   const modelLabel = optionalJrDatabaseString(row, 'model_label')
   const model: JrModelChoice | null =
     modelId && modelLabel
-      ? { id: modelId, label: modelLabel, capabilitySource: 'orca-default' }
+      ? { id: modelId, label: modelLabel, capabilitySource: 'orca-session-catalog' }
       : null
   const worktreeId = optionalJrDatabaseString(row, 'worktree_id')
   const worktreePath = optionalJrDatabaseString(row, 'worktree_path')
