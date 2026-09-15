@@ -84,6 +84,39 @@ describe('JR card execution launch', () => {
     )
   })
 
+  it('records a nonzero harness exit as blocked through the lifecycle subscription', async () => {
+    let reportExit: ((code: number) => void) | null = null
+    const blockExecution = vi.fn().mockResolvedValue(undefined)
+    const launcher = createJrCardExecutionLauncher({
+      prepareExecution: vi.fn().mockResolvedValue(request),
+      createWorktree: vi
+        .fn()
+        .mockResolvedValue({ id: 'repo-1::/worktree', path: '/worktree', branch: 'jr/launch' }),
+      launchAgent: vi.fn().mockImplementation(async (args: { onExit: (code: number) => void }) => {
+        reportExit = args.onExit
+        return { agent: 'cursor', tabId: 'tab-1', paneKey: 'tab-1:pane-1', ptyId: 'pty-1' }
+      }),
+      subscribeWorktreeProgress: () => vi.fn(),
+      recordWorktreeProgress: vi.fn().mockResolvedValue(undefined),
+      recordWorktreeCreated: vi.fn().mockResolvedValue(undefined),
+      recordAgentStarted: vi.fn().mockResolvedValue(undefined),
+      recordAgentStatus: vi.fn().mockResolvedValue(undefined),
+      recordAgentExit: vi.fn().mockResolvedValue(undefined),
+      blockExecution,
+      createId: () => 'creation-3'
+    })
+
+    await launcher.launch(request.cardId, controller)
+    reportExit?.(2)
+    await Promise.resolve()
+
+    expect(blockExecution).toHaveBeenCalledWith(
+      'card-1',
+      'Orca harness exited with code 2.',
+      controller
+    )
+  })
+
   it('persists a blocked card when native worktree creation fails', async () => {
     const blockExecution = vi.fn().mockResolvedValue(undefined)
     const launcher = createJrCardExecutionLauncher({
