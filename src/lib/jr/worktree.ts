@@ -80,10 +80,11 @@ export async function createNativeWorktree(card: JrCard): Promise<WorktreeInfo> 
 export async function removeWorktree(
   worktreePath: string,
   branch: string,
-  repoRoot = await getRepositoryRoot(),
+  repoRoot?: string,
 ) {
-  await runGit(["worktree", "remove", "--force", worktreePath], repoRoot);
-  await runGit(["branch", "-D", branch], repoRoot);
+  const root = repoRoot ?? (await getRepositoryRoot());
+  await runGit(["worktree", "remove", "--force", worktreePath], root);
+  await runGit(["branch", "-D", branch], root);
 }
 
 function projectionRoot(worktreePath: string) {
