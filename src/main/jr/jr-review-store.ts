@@ -85,15 +85,19 @@ export class JrReviewStore {
   }
 
   returnToExecution(card: JrCard, actor: JrControllerActor): void {
-    if (card.status !== 'verifying' && card.status !== 'pending_merge_approval') {
-      throw new Error('卡片必须处于 验证中 或 待批准合并 才能返回执行。')
+    const canReturnFromShipping = card.status === 'shipping' && !card.delivery
+    if (
+      card.status !== 'verifying' &&
+      card.status !== 'pending_merge_approval' &&
+      !canReturnFromShipping
+    ) {
+      throw new Error('卡片必须处于 验证中、待批准合并，或未完成的交付中，才能返回执行。')
     }
     setJrCardStatus(this.db, card.id, 'executing')
     recordJrEvent(this.db, card.id, '已退回执行', 'Controller 要求继续在 worktree 中修改。', actor)
   }
 
   prepareShip(card: JrCard, actor: JrControllerActor): JrShipRequest {
-    requireJrCardState(card, 'pending_merge_approval', '批准合并')
     const snapshot = requireSnapshot(card)
     const worktree = card.execution.worktree
     const repositoryId = card.execution.repositoryId
@@ -101,6 +105,20 @@ export class JrReviewStore {
     if (!worktree || !repositoryId || !baseRef) {
       throw new Error('JR 交付需要已记录的 worktree 和基础分支。')
     }
+    if (card.status === 'shipping') {
+      if (card.delivery) {
+        throw new Error('卡片已经完成交付，不能重试合并。')
+      }
+      return {
+        cardId: card.id,
+        title: card.title,
+        worktree,
+        repositoryId,
+        baseRef,
+        review: snapshot
+      }
+    }
+    requireJrCardState(card, 'pending_merge_approval', '批准合并')
     setJrCardStatus(this.db, card.id, 'shipping')
     recordJrEvent(
       this.db,

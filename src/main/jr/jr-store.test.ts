@@ -241,6 +241,38 @@ describe('JrStore', () => {
     )
   })
 
+  it('retries prepareShip after a blocked shipping merge and can return to execution', async () => {
+    const store = await createStore()
+    const card = await reachExecuting(store, 'Retry local merge')
+    store.requestReview(
+      card.id,
+      jrReviewSnapshot(card, { changedFiles: 2, commitsAhead: 1 }),
+      controller
+    )
+    store.passVerification(card.id, controller)
+    const firstShip = store.prepareShip(card.id, controller)
+    expect(firstShip.baseRef).toBe('main')
+
+    const blocked = store.blockExecution(card.id, 'untracked files would be overwritten', controller)
+    expect(blocked.status).toBe('blocked')
+    expect(blocked.blocked?.fromStatus).toBe('shipping')
+
+    const resumed = store.resumeBlocked(card.id, controller)
+    expect(resumed.status).toBe('shipping')
+    expect(resumed.delivery).toBeNull()
+
+    const retry = store.prepareShip(card.id, controller)
+    expect(retry).toMatchObject({
+      cardId: card.id,
+      worktree: { branch: 'jr/worktree' },
+      baseRef: 'main'
+    })
+    expect(store.readCard(card.id).status).toBe('shipping')
+
+    const executing = store.returnToExecution(card.id, controller)
+    expect(executing.status).toBe('executing')
+  })
+
   it('enters verifying after a successful harness exit plus review snapshot', async () => {
     const store = await createStore()
     const card = await reachExecuting(store, 'Auto verify after exit')
