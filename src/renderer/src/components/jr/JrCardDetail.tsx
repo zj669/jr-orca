@@ -192,9 +192,7 @@ export function JrCardDetail({
 
       <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-3">
         <div className="space-y-1">
-          <Label htmlFor="jr-repository" className="text-xs">
-            Repository
-          </Label>
+          <Label htmlFor="jr-repository">Repository</Label>
           <Select
             value={card.execution.repositoryId ?? undefined}
             onValueChange={handleRepositoryChange}
@@ -213,9 +211,7 @@ export function JrCardDetail({
           </Select>
         </div>
         <div className="space-y-1">
-          <Label htmlFor="jr-base-ref" className="text-xs">
-            Base ref
-          </Label>
+          <Label htmlFor="jr-base-ref">Base ref</Label>
           <Input
             key={`${card.id}:${card.execution.baseRef ?? ''}`}
             id="jr-base-ref"
@@ -226,9 +222,7 @@ export function JrCardDetail({
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="jr-setup-policy" className="text-xs">
-            Setup policy
-          </Label>
+          <Label htmlFor="jr-setup-policy">Setup policy</Label>
           <Select
             value={card.execution.setupDecision}
             onValueChange={handleSetupPolicyChange}
