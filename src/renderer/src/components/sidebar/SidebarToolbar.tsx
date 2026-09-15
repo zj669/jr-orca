@@ -1,5 +1,5 @@
 import React from 'react'
-import { Kanban } from 'lucide-react'
+import { Kanban, LayoutDashboard } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
@@ -13,14 +13,18 @@ const WORKSPACE_BOARD_MOVED_HINT_STORAGE_KEY = 'orca.workspaceBoardMovedHintSeen
 const WORKSPACE_BOARD_MOVED_HINT_DURATION_MS = 12000
 
 type SidebarToolbarProps = {
+  jrBoardOpen: boolean
   workspaceBoardOpen: boolean
   workspaceBoardDragPreviewOpen?: boolean
+  onJrBoardToggle: () => void
   onWorkspaceBoardToggle: () => void
 }
 
 const SidebarToolbar = React.memo(function SidebarToolbar({
+  jrBoardOpen,
   workspaceBoardOpen,
   workspaceBoardDragPreviewOpen = false,
+  onJrBoardToggle,
   onWorkspaceBoardToggle
 }: SidebarToolbarProps) {
   // Why: this memo boundary needs its own language subscription, while
@@ -77,6 +81,24 @@ const SidebarToolbar = React.memo(function SidebarToolbar({
         </div>
         <div className="flex items-center gap-1">
           <ScrollToCurrentWorkspaceToolbarButton />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={jrBoardOpen ? 'secondary' : 'ghost'}
+                size="icon-xs"
+                type="button"
+                aria-label="JR Delivery Board"
+                aria-pressed={jrBoardOpen}
+                onClick={onJrBoardToggle}
+                className="text-muted-foreground"
+              >
+                <LayoutDashboard className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={4}>
+              {jrBoardOpen ? 'Close JR Delivery Board' : 'Open JR Delivery Board'}
+            </TooltipContent>
+          </Tooltip>
           <Tooltip open={workspaceBoardMovedHintOpen ? true : undefined}>
             <TooltipTrigger asChild>
               <Button

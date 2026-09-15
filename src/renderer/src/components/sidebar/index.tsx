@@ -29,6 +29,7 @@ const WorktreeVisibilityDialog = lazyWithRetry(() => import('./WorktreeVisibilit
 const OrcaYamlTrustDialog = lazyWithRetry(() => import('./OrcaYamlTrustDialog'))
 const ForgetSshWorkspaceDialog = lazyWithRetry(() => import('./ForgetSshWorkspaceDialog'))
 const AgentDashboardSidebarHost = lazyWithRetry(() => import('./AgentDashboardSidebarHost'))
+const JrBoardDrawer = lazyWithRetry(() => import('../jr/JrBoardDrawer'))
 
 const MIN_WIDTH = 220
 const MAX_WIDTH = 500
@@ -64,6 +65,7 @@ function Sidebar({
   const setAgentGroupBy = useAppStore((s) => s.setAgentsGroupBy)
   const [agentQuery, setAgentQuery] = React.useState('')
   const [agentOptionsTarget, setAgentOptionsTarget] = React.useState<HTMLDivElement | null>(null)
+  const [jrBoardOpen, setJrBoardOpen] = React.useState(false)
   const agentsScrollTopRef = React.useRef(0)
   // Held here so collapsed groups (and the layout the saved scrollTop assumes)
   // survive the Agents list unmounting on sidebar body switches.
@@ -128,6 +130,9 @@ function Sidebar({
     if (!sidebarOpen && workspaceBoardRenderedOpen) {
       closeWorkspaceBoard()
     }
+    if (!sidebarOpen) {
+      setJrBoardOpen(false)
+    }
   }, [closeWorkspaceBoard, sidebarOpen, workspaceBoardRenderedOpen])
 
   useEffect(() => {
@@ -147,6 +152,17 @@ function Sidebar({
   })
 
   useWorkspaceRevealBodyRedirect(sidebarOpen && sidebarBody === 'agents')
+
+  const toggleJrBoard = React.useCallback(() => {
+    setJrBoardOpen((open) => !open)
+  }, [])
+  const handleJrBoardOpenChange = React.useCallback((open: boolean) => {
+    setJrBoardOpen(open)
+  }, [])
+  const toggleWorkspaceBoardWithJrClosed = React.useCallback(() => {
+    setJrBoardOpen(false)
+    toggleWorkspaceBoard()
+  }, [toggleWorkspaceBoard])
 
   return (
     <TooltipProvider delayDuration={400}>
@@ -196,9 +212,11 @@ function Sidebar({
 
               {/* Fixed bottom toolbar */}
               <SidebarToolbar
+                jrBoardOpen={jrBoardOpen}
                 workspaceBoardOpen={workspaceBoardOpen}
                 workspaceBoardDragPreviewOpen={workspaceBoardDragPreviewOpen}
-                onWorkspaceBoardToggle={toggleWorkspaceBoard}
+                onJrBoardToggle={toggleJrBoard}
+                onWorkspaceBoardToggle={toggleWorkspaceBoardWithJrClosed}
               />
             </div>
           </>
@@ -259,6 +277,11 @@ function Sidebar({
           onOpenChange={handleWorkspaceBoardOpenChange}
           onMenuOpenChange={setWorkspaceBoardMenuOpen}
         />
+      ) : null}
+      {sidebarOpen ? (
+        <React.Suspense fallback={null}>
+          <JrBoardDrawer open={jrBoardOpen} onOpenChange={handleJrBoardOpenChange} />
+        </React.Suspense>
       ) : null}
       {showAgentDashboard ? (
         <React.Suspense fallback={null}>

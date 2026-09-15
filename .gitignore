@@ -32,6 +32,12 @@ native/**/.build/
 native/windows-registry/build/
 native/windows-registry/bin/
 
+# JR local projections and retired web-prototype output.
+/.jr/
+/.next/
+/agent-tools/
+/next-env.d.ts
+
 # pnpm
 .pnpm-store/
 package-lock.json
