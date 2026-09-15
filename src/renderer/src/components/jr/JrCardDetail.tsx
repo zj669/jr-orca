@@ -6,6 +6,7 @@ import { JrCardSetupFields } from '@/components/jr/JrCardSetupFields'
 import { launchJrCardExecution } from '@/lib/jr-card-execution-launch'
 import { launchJrPlanningSession } from '@/lib/jr-card-planning-launch'
 import { jrExecutionContractIssues } from '../../../../shared/jr/jr-card-contract'
+import { jrStatusLabel } from '../../../../shared/jr/jr-status-labels'
 import type { Repo } from '../../../../shared/repo-types'
 import type {
   JrBoardSnapshot,
@@ -162,13 +163,35 @@ export function JrCardDetail({
 
       {card.blocked ? (
         <div className="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
-          <p className="font-medium text-destructive">受阻</p>
-          <p className="mt-1 text-muted-foreground">
-            负责人 {card.blocked.owner} · 先前状态 {card.blocked.fromStatus}
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-medium text-destructive">受阻</p>
+              <p className="mt-1 text-muted-foreground">
+                负责人 {card.blocked.owner} · 先前状态 {jrStatusLabel(card.blocked.fromStatus)}
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => runAction(() => window.api.jr.resumeBlocked(card.id, controller))}
+              disabled={saving}
+            >
+              <RotateCcw />
+              恢复到先前状态
+            </Button>
+          </div>
+          <p className="mt-2 max-h-24 overflow-y-auto whitespace-pre-wrap break-all text-xs text-muted-foreground scrollbar-sleek">
+            {card.blocked.reason}
           </p>
-          <p className="mt-1 whitespace-pre-wrap">{card.blocked.reason}</p>
         </div>
       ) : null}
+
+      <JrCardReviewActions
+        card={card}
+        saving={saving}
+        controller={controller}
+        runAction={runAction}
+      />
 
       <JrCardSetupFields
         card={card}
@@ -232,16 +255,6 @@ export function JrCardDetail({
               批准并启动执行
             </Button>
           </div>
-        ) : card.status === 'blocked' ? (
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => runAction(() => window.api.jr.resumeBlocked(card.id, controller))}
-            disabled={saving}
-          >
-            <RotateCcw />
-            恢复到先前状态
-          </Button>
         ) : (
           <p className="text-sm font-medium">{statusMessage(card.status)}</p>
         )}
@@ -249,13 +262,6 @@ export function JrCardDetail({
       {card.status === 'planning' && contractIssues.length > 0 ? (
         <p className="mt-2 text-xs text-muted-foreground">{contractIssues[0]}</p>
       ) : null}
-
-      <JrCardReviewActions
-        card={card}
-        saving={saving}
-        controller={controller}
-        runAction={runAction}
-      />
 
       {card.artifacts.length > 0 ? (
         <details className="mt-4 border-t pt-4">

@@ -193,7 +193,7 @@ export default function JrBoardDrawer({
                       return (
                         <section
                           key={lane.status}
-                          className="flex min-h-56 w-52 shrink-0 flex-col rounded-xl border bg-card p-3 text-card-foreground"
+                          className="flex max-h-64 min-h-40 w-52 shrink-0 flex-col rounded-xl border bg-card p-3 text-card-foreground"
                           aria-label={lane.label}
                           data-jr-lane={lane.status}
                         >
@@ -210,7 +210,7 @@ export default function JrBoardDrawer({
                               {cards.length}
                             </span>
                           </div>
-                          <div className="space-y-2">
+                          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto scrollbar-sleek">
                             {cards.map((card) => (
                               <button
                                 key={card.id}

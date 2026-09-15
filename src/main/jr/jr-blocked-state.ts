@@ -1,6 +1,7 @@
 import type SyncDatabase from '../sqlite/sync-database'
 import type { JrActor, JrCard, JrCardStatus } from '../../shared/jr/jr-types'
 import { jrNow, recordJrEvent, setJrCardStatus } from './jr-card-records'
+import { sanitizeJrBlockReason } from './jr-block-reason'
 
 const RESUMABLE: readonly JrCardStatus[] = [
   'idea',
@@ -21,7 +22,7 @@ export function persistJrBlocked(
   actor: JrActor,
   kind: string
 ): void {
-  const detail = reason.trim()
+  const detail = sanitizeJrBlockReason(reason)
   if (detail.length === 0) {
     throw new Error('请先为卡片设置 受阻原因。')
   }

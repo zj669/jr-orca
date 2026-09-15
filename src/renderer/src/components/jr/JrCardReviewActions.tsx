@@ -28,7 +28,7 @@ export function JrCardReviewActions({
   }
 
   return (
-    <div className="mt-4 space-y-3 border-t pt-4">
+    <div className="mt-4 space-y-3">
       {card.review ? (
         <p className="text-xs text-muted-foreground">
           {card.review.changedFiles} 个文件 · ahead {card.review.commitsAhead} · uncommitted{' '}
