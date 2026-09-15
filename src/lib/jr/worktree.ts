@@ -113,10 +113,10 @@ export async function materializeTrellisProjection(card: JrCard) {
 }
 
 async function collectProjectionPaths(root: string, directory = root): Promise<string[]> {
-  let entries: Awaited<ReturnType<typeof fs.readdir>>;
-  try {
-    entries = await fs.readdir(directory, { withFileTypes: true });
-  } catch {
+  const entries = await fs
+    .readdir(directory, { encoding: "utf8", withFileTypes: true })
+    .catch(() => null);
+  if (!entries) {
     return [];
   }
 
