@@ -75,4 +75,36 @@ describe('JrStore', () => {
       '请先为卡片选择 Phase 1 harness 和模型。'
     )
   })
+
+  it('retains card configuration and Trellis artifacts after reopening SQLite', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'orca-jr-reopen-'))
+    temporaryDirectories.push(directory)
+    const databasePath = join(directory, 'jr.sqlite')
+    const store = new JrStore(databasePath)
+    stores.push(store)
+    const card = store.createCard({ title: 'Persist artifacts' }, controller)
+    store.updateCardConfiguration(card.id, { harness: 'gemini', modelId: 'default' }, controller)
+    store.transition(card.id, 'begin-discussion', controller)
+    store.transition(card.id, 'begin-planning', controller)
+    store.close()
+    stores.splice(stores.indexOf(store), 1)
+
+    const reopened = new JrStore(databasePath)
+    stores.push(reopened)
+    const restored = reopened.listBoard().cards.find((item) => item.id === card.id)
+
+    expect(restored).toMatchObject({
+      harness: 'gemini',
+      model: { id: 'default' },
+      status: 'planning'
+    })
+    expect(restored?.artifacts.map((artifact) => artifact.path)).toEqual(
+      expect.arrayContaining([
+        `tasks/${card.id}/discussion.md`,
+        `tasks/${card.id}/prd.md`,
+        'spec/jr-controller.md',
+        'workflow.md'
+      ])
+    )
+  })
 })

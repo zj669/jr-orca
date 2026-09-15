@@ -7,7 +7,12 @@ import {
   type JrCreateCardInput,
   type JrUpdateCardInput
 } from '../../shared/jr/jr-types'
-import { getJrStore } from '../jr/jr-store'
+import { getJrStore, type JrStore } from '../jr/jr-store'
+
+type JrHandlerStore = Pick<
+  JrStore,
+  'listBoard' | 'createCard' | 'updateCardConfiguration' | 'transition'
+>
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object'
@@ -62,15 +67,15 @@ function parseTransition(value: unknown): JrCardTransition {
   return value
 }
 
-export function registerJrHandlers(): void {
-  ipcMain.handle('jr:listBoard', () => getJrStore().listBoard())
+export function registerJrHandlers(store: JrHandlerStore = getJrStore()): void {
+  ipcMain.handle('jr:listBoard', () => store.listBoard())
   ipcMain.handle('jr:createCard', (_event, rawInput: unknown, rawActor: unknown) =>
-    getJrStore().createCard(parseCreateCardInput(rawInput), parseActor(rawActor))
+    store.createCard(parseCreateCardInput(rawInput), parseActor(rawActor))
   )
   ipcMain.handle(
     'jr:updateCardConfiguration',
     (_event, cardId: unknown, rawInput: unknown, rawActor: unknown) =>
-      getJrStore().updateCardConfiguration(
+      store.updateCardConfiguration(
         requireString(cardId, 'card id'),
         parseConfigurationInput(rawInput),
         parseActor(rawActor)
@@ -79,7 +84,7 @@ export function registerJrHandlers(): void {
   ipcMain.handle(
     'jr:transitionCard',
     (_event, cardId: unknown, rawTransition: unknown, rawActor: unknown) =>
-      getJrStore().transition(
+      store.transition(
         requireString(cardId, 'card id'),
         parseTransition(rawTransition),
         parseActor(rawActor)
