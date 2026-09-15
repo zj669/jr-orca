@@ -60,7 +60,7 @@ describe('JR IPC', () => {
     const store = await createStore()
     registerJrHandlers(store)
 
-    expect(ipcHandleMock).toHaveBeenCalledTimes(4)
+    expect(ipcHandleMock).toHaveBeenCalledTimes(12)
 
     await invoke(
       'jr:createCard',
@@ -88,6 +88,13 @@ describe('JR IPC', () => {
       kind: 'master-controller',
       id: 'delivery-master'
     })
+    await invoke(
+      'jr:updateCardExecutionTarget',
+      undefined,
+      card.id,
+      { repositoryId: 'repo-1', baseRef: 'main', setupDecision: 'inherit' },
+      { kind: 'human-controller', id: 'walker' }
+    )
 
     expect(() =>
       invoke('jr:transitionCard', undefined, card.id, 'request-execution-approval', {
@@ -120,6 +127,69 @@ describe('JR IPC', () => {
     expect(persisted?.events[0]).toMatchObject({
       kind: '等待执行审批',
       actor: 'human-controller:walker'
+    })
+  })
+
+  it('requires controller capability and validates native worktree lifecycle payloads', async () => {
+    const store = await createStore()
+    registerJrHandlers(store)
+    const card = store.createCard(
+      { title: 'Launch validation' },
+      { kind: 'human-controller', id: 'walker' }
+    )
+    store.updateCardConfiguration(
+      card.id,
+      { harness: 'codex', modelId: 'default' },
+      {
+        kind: 'human-controller',
+        id: 'walker'
+      }
+    )
+    store.updateCardExecutionTarget(
+      card.id,
+      { repositoryId: 'repo-1', baseRef: 'main', setupDecision: 'inherit' },
+      { kind: 'human-controller', id: 'walker' }
+    )
+    store.transition(card.id, 'begin-discussion', { kind: 'human-controller', id: 'walker' })
+    store.transition(card.id, 'begin-planning', { kind: 'human-controller', id: 'walker' })
+    store.transition(card.id, 'request-execution-approval', {
+      kind: 'human-controller',
+      id: 'walker'
+    })
+
+    expect(() =>
+      invoke('jr:prepareExecution', undefined, card.id, { kind: 'task-agent', id: 'worker' })
+    ).toThrow('JR actor must have controller capability.')
+
+    await invoke('jr:prepareExecution', undefined, card.id, {
+      kind: 'human-controller',
+      id: 'walker'
+    })
+    await invoke(
+      'jr:recordWorktreeCreated',
+      undefined,
+      card.id,
+      { id: 'repo-1::/tmp/jr', path: '/tmp/jr', branch: 'jr/launch-validation' },
+      { kind: 'human-controller', id: 'walker' }
+    )
+    await invoke(
+      'jr:recordAgentStarted',
+      undefined,
+      card.id,
+      { agent: 'codex', tabId: 'tab-1', paneKey: 'tab-1:pane-1', ptyId: 'pty-1' },
+      { kind: 'human-controller', id: 'walker' }
+    )
+    await invoke('jr:recordAgentStatus', undefined, card.id, 'blocked', {
+      kind: 'human-controller',
+      id: 'walker'
+    })
+
+    expect(store.listBoard().cards.find((item) => item.id === card.id)).toMatchObject({
+      status: 'blocked',
+      execution: {
+        worktree: { branch: 'jr/launch-validation' },
+        agentSession: { agent: 'codex', status: 'blocked' }
+      }
     })
   })
 })

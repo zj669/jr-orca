@@ -46,6 +46,16 @@ describe('JrStore', () => {
     )
     expect(configured.harness).toBe('codex')
     expect(configured.model?.id).toBe('default')
+    const targeted = store.updateCardExecutionTarget(
+      card.id,
+      { repositoryId: 'repo-1', baseRef: 'main', setupDecision: 'run' },
+      controller
+    )
+    expect(targeted.execution).toMatchObject({
+      repositoryId: 'repo-1',
+      baseRef: 'main',
+      setupDecision: 'run'
+    })
 
     const discussing = store.transition(card.id, 'begin-discussion', controller)
     expect(discussing.status).toBe('discussion')
@@ -84,6 +94,11 @@ describe('JrStore', () => {
     stores.push(store)
     const card = store.createCard({ title: 'Persist artifacts' }, controller)
     store.updateCardConfiguration(card.id, { harness: 'gemini', modelId: 'default' }, controller)
+    store.updateCardExecutionTarget(
+      card.id,
+      { repositoryId: 'repo-1', baseRef: 'main', setupDecision: 'inherit' },
+      controller
+    )
     store.transition(card.id, 'begin-discussion', controller)
     store.transition(card.id, 'begin-planning', controller)
     store.close()
@@ -105,6 +120,88 @@ describe('JrStore', () => {
         'spec/jr-controller.md',
         'workflow.md'
       ])
+    )
+  })
+
+  it('persists the approved execution handoff and blocks only after Orca reports a failure', async () => {
+    const store = await createStore()
+    const card = store.createCard({ title: 'Create a real worktree' }, controller)
+    store.updateCardConfiguration(card.id, { harness: 'cursorcli', modelId: 'default' }, controller)
+    store.updateCardExecutionTarget(
+      card.id,
+      { repositoryId: 'repo-orca', baseRef: 'main', setupDecision: 'skip' },
+      controller
+    )
+    store.transition(card.id, 'begin-discussion', controller)
+    store.transition(card.id, 'begin-planning', controller)
+    store.transition(card.id, 'request-execution-approval', controller)
+
+    const launch = store.prepareExecution(card.id, controller)
+    expect(launch).toMatchObject({
+      harness: 'cursorcli',
+      execution: {
+        repositoryId: 'repo-orca',
+        baseRef: 'main',
+        setupDecision: 'skip'
+      }
+    })
+    expect(launch.prompt).toContain(`tasks/${card.id}/prd.md`)
+    expect(store.listBoard().cards.find((item) => item.id === card.id)?.status).toBe(
+      'creating_worktree'
+    )
+
+    store.recordWorktreeProgress(card.id, 'fetching', controller)
+    store.recordWorktreeCreated(
+      card.id,
+      { id: 'repo-orca::/tmp/jr-worktree', path: '/tmp/jr-worktree', branch: 'jr/worktree' },
+      controller
+    )
+    const executing = store.recordAgentStarted(
+      card.id,
+      {
+        agent: 'cursor',
+        tabId: 'tab-jr',
+        paneKey: 'tab-jr:pane-jr',
+        ptyId: 'pty-jr'
+      },
+      controller
+    )
+
+    expect(executing).toMatchObject({
+      status: 'executing',
+      execution: {
+        worktree: {
+          id: 'repo-orca::/tmp/jr-worktree',
+          path: '/tmp/jr-worktree',
+          branch: 'jr/worktree'
+        },
+        agentSession: {
+          agent: 'cursor',
+          tabId: 'tab-jr',
+          paneKey: 'tab-jr:pane-jr',
+          ptyId: 'pty-jr',
+          status: 'working'
+        }
+      }
+    })
+
+    const blocked = store.recordAgentStatus(card.id, 'blocked', controller)
+    expect(blocked.status).toBe('blocked')
+    expect(blocked.events[0]).toMatchObject({
+      kind: 'Harness 报告受阻',
+      actor: 'human-controller:test-walker'
+    })
+  })
+
+  it('requires a persisted execution target before controller approval', async () => {
+    const store = await createStore()
+    const card = store.createCard({ title: 'Missing execution target' }, controller)
+    store.updateCardConfiguration(card.id, { harness: 'claude', modelId: 'default' }, controller)
+    store.transition(card.id, 'begin-discussion', controller)
+    store.transition(card.id, 'begin-planning', controller)
+
+    expect(() => store.transition(card.id, 'request-execution-approval', controller)).toThrow(
+      '请先为卡片设置 仓库。'
     )
   })
 })

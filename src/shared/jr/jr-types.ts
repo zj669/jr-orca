@@ -23,6 +23,32 @@ export type JrModelChoice = {
   capabilitySource: 'orca-default'
 }
 
+export type JrExecutionTarget = {
+  repositoryId: string | null
+  baseRef: string | null
+  setupDecision: 'inherit' | 'run' | 'skip'
+}
+
+export type JrWorktreeReference = {
+  id: string
+  path: string
+  branch: string
+}
+
+export type JrAgentSession = {
+  agent: 'cursor' | 'claude' | 'codex' | 'gemini'
+  tabId: string
+  paneKey: string
+  ptyId: string
+  status: 'working' | 'blocked' | 'waiting' | 'done' | null
+}
+
+export type JrExecutionState = JrExecutionTarget & {
+  worktree: JrWorktreeReference | null
+  worktreePhase: 'fetching' | 'creating' | null
+  agentSession: JrAgentSession | null
+}
+
 export type JrCard = {
   id: string
   title: string
@@ -30,6 +56,7 @@ export type JrCard = {
   status: JrCardStatus
   harness: JrHarness | null
   model: JrModelChoice | null
+  execution: JrExecutionState
   createdAt: string
   updatedAt: string
   artifacts: JrArtifact[]
@@ -76,6 +103,27 @@ export type JrUpdateCardInput = {
   harness: JrHarness
   modelId: string
 }
+
+export type JrUpdateExecutionTargetInput = {
+  repositoryId: string
+  baseRef: string
+  setupDecision: JrExecutionTarget['setupDecision']
+}
+
+export type JrExecutionLaunchRequest = {
+  cardId: string
+  title: string
+  harness: JrHarness
+  model: JrModelChoice
+  execution: Required<JrExecutionTarget>
+  prompt: string
+}
+
+export type JrRecordWorktreeInput = JrWorktreeReference
+
+export type JrRecordAgentSessionInput = Omit<JrAgentSession, 'status'>
+
+export type JrAgentLifecycleState = NonNullable<JrAgentSession['status']>
 
 export const JR_CARD_TRANSITIONS = [
   'begin-discussion',
