@@ -9,6 +9,8 @@ const card = {
   id: 'card-1',
   title: 'MCP card',
   description: 'Read via tools',
+  acceptance: 'Tools return SQLite-backed payloads.',
+  priority: 'p2',
   status: 'planning',
   harness: 'claude',
   model: { id: 'sonnet', label: 'Sonnet', capabilitySource: 'orca-session-catalog' },
@@ -22,6 +24,7 @@ const card = {
   },
   review: null,
   delivery: null,
+  blocked: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
   artifacts: [
@@ -43,6 +46,7 @@ function host(): JrTrellisToolHost {
       readCard: () => card,
       transition: () => card,
       writeArtifact: () => card,
+      writeTaskRecord: () => card,
       recordEvent: () => card
     },
     { cardId: 'card-1', actor: { kind: 'task-agent', id: 'worker' } }
@@ -50,8 +54,10 @@ function host(): JrTrellisToolHost {
 }
 
 describe('JR MCP protocol', () => {
-  it('lists Trellis tools and returns JSON payloads from tools/call', () => {
-    expect(handleJrMcpMessage(host(), { jsonrpc: '2.0', id: 1, method: 'tools/list' })).toEqual({
+  it('lists Trellis tools and returns JSON payloads from tools/call', async () => {
+    expect(
+      await handleJrMcpMessage(host(), { jsonrpc: '2.0', id: 1, method: 'tools/list' })
+    ).toEqual({
       jsonrpc: '2.0',
       id: 1,
       result: {
@@ -59,7 +65,7 @@ describe('JR MCP protocol', () => {
       }
     })
     expect(
-      handleJrMcpMessage(host(), {
+      await handleJrMcpMessage(host(), {
         jsonrpc: '2.0',
         id: 2,
         method: 'tools/call',
@@ -74,9 +80,9 @@ describe('JR MCP protocol', () => {
     })
   })
 
-  it('returns a tool error when a task agent asks for execution approval', () => {
+  it('returns a tool error when a task agent asks for execution approval', async () => {
     expect(
-      handleJrMcpMessage(host(), {
+      await handleJrMcpMessage(host(), {
         jsonrpc: '2.0',
         id: 3,
         method: 'tools/call',

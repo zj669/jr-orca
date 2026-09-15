@@ -3,6 +3,8 @@ import type { JrActor, JrArtifact, JrCard } from '../../shared/jr/jr-types'
 import { jrTaskArtifactPath } from './jr-trellis-artifact-templates'
 import { assertJrArtifactPath, normalizeJrArtifactPath } from './jr-artifact-path'
 import { JR_TRELLIS_TOOL_NAMES, type JrTrellisToolName } from './jr-trellis-tool-catalog'
+import { applyJrTrellisMutation } from './jr-trellis-tool-mutations'
+import type { JrTrellisProjectionWriter } from './jr-trellis-projection'
 import { jrNow } from './jr-card-records'
 
 export type JrTrellisToolStore = {
@@ -13,16 +15,32 @@ export type JrTrellisToolStore = {
     actor: JrActor
   ): JrCard
   writeArtifact(cardId: string, path: string, content: string, actor: JrActor): JrCard
+  writeTaskRecord(
+    cardId: string,
+    input: { title?: string; summary?: string; acceptance?: string },
+    actor: JrActor
+  ): JrCard
   recordEvent(cardId: string, kind: string, detail: string, actor: JrActor): JrCard
 }
 
 export type JrTrellisToolSession = {
   cardId: string
   actor: JrActor
+  projection?: JrTrellisProjectionWriter
 }
 
 const FORBIDDEN_PROMOTION =
   'Task agents cannot promote a JR card to 待批准执行 / 创建工作树 / 交付中 / 已合并.'
+
+const MUTATIONS = new Set([
+  'jr_task_create',
+  'jr_task_update',
+  'jr_context_get',
+  'jr_context_set',
+  'jr_spec_propose',
+  'jr_projection_sync',
+  'jr_projection_verify'
+])
 
 export class JrTrellisToolHost {
   constructor(
@@ -30,9 +48,16 @@ export class JrTrellisToolHost {
     private readonly session: JrTrellisToolSession
   ) {}
 
-  call(name: string, args: Record<string, unknown>): unknown {
+  async call(name: string, args: Record<string, unknown>): Promise<unknown> {
     if (!isJrTrellisToolName(name)) {
       throw new Error(`Unknown JR Trellis tool: ${name}`)
+    }
+    if (MUTATIONS.has(name)) {
+      return applyJrTrellisMutation(
+        { store: this.store, session: this.session, projection: this.session.projection },
+        name,
+        args
+      )
     }
     const card = this.store.readCard(this.session.cardId)
     switch (name) {
@@ -62,6 +87,8 @@ export class JrTrellisToolHost {
         return this.append(card, 'research.md', requireText(args.entry, 'entry'))
       case 'jr_card_request_transition':
         return this.requestTransition(card, args.transition)
+      default:
+        throw new Error(`Unhandled JR Trellis tool: ${name}`)
     }
   }
 
@@ -141,10 +168,13 @@ function summarizeCard(card: JrCard): unknown {
     id: card.id,
     title: card.title,
     description: card.description,
+    acceptance: card.acceptance,
+    priority: card.priority,
     status: card.status,
     harness: card.harness,
     model: card.model,
-    execution: card.execution
+    execution: card.execution,
+    blocked: card.blocked
   }
 }
 

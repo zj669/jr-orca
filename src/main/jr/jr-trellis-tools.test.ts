@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { JrActor, JrControllerActor } from '../../shared/jr/jr-types'
 import { JrStore } from './jr-store'
 import { JrTrellisToolHost } from './jr-trellis-tools'
+import { createLocalJrProjectionWriter } from './jr-trellis-projection-fs'
 
 const temporaryDirectories: string[] = []
 const stores: JrStore[] = []
@@ -36,20 +37,20 @@ describe('JrTrellisToolHost', () => {
     const card = await reachPlanning(store)
     const host = new JrTrellisToolHost(store, { cardId: card.id, actor: worker })
 
-    expect(host.call('jr_workflow_get', {})).toEqual(
+    expect(await host.call('jr_workflow_get', {})).toEqual(
       expect.objectContaining({
         canonicalStore: 'jr-sqlite',
         trellisProjection: 'optional-read-only',
         workflow: expect.objectContaining({ path: 'workflow.md', version: 1 })
       })
     )
-    expect(host.call('jr_specs_list', {})).toEqual({
+    expect(await host.call('jr_specs_list', {})).toEqual({
       specs: [expect.objectContaining({ path: 'spec/jr-controller.md' })]
     })
-    expect(host.call('jr_specs_get', { path: 'spec/jr-controller.md' })).toEqual({
+    expect(await host.call('jr_specs_get', { path: 'spec/jr-controller.md' })).toEqual({
       spec: expect.objectContaining({ content: expect.stringContaining('JR MCP tools') })
     })
-    expect(host.call('jr_task_get', {})).toEqual(
+    expect(await host.call('jr_task_get', {})).toEqual(
       expect.objectContaining({
         artifacts: expect.arrayContaining([
           expect.objectContaining({ path: `tasks/${card.id}/prd.md` }),
@@ -67,27 +68,31 @@ describe('JrTrellisToolHost', () => {
     const path = `tasks/${card.id}/prd.md`
 
     expect(
-      host.call('jr_artifact_upsert', {
+      await host.call('jr_artifact_upsert', {
         path,
         content: '# Updated PRD\n\nKeep recovery specific.\n'
       })
     ).toEqual({ artifact: expect.objectContaining({ version: 2, path }) })
     expect(
-      host.call('jr_artifact_upsert', {
+      await host.call('jr_artifact_upsert', {
         path,
         content: '# Updated PRD\n\nKeep recovery specific and testable.\n'
       })
     ).toEqual({ artifact: expect.objectContaining({ version: 3 }) })
-    expect(host.call('jr_artifacts_list', {})).toEqual({
+    expect(await host.call('jr_artifacts_list', {})).toEqual({
       artifacts: expect.arrayContaining([expect.objectContaining({ path, version: 3 })])
     })
-    expect(host.call('jr_journal_append', { entry: 'Chose SQLite as the write source.' })).toEqual({
+    expect(
+      await host.call('jr_journal_append', { entry: 'Chose SQLite as the write source.' })
+    ).toEqual({
       artifact: expect.objectContaining({
         path: `tasks/${card.id}/journal.md`,
         content: expect.stringContaining('Chose SQLite as the write source.')
       })
     })
-    expect(host.call('jr_research_append', { entry: 'Trellis files are a projection.' })).toEqual({
+    expect(
+      await host.call('jr_research_append', { entry: 'Trellis files are a projection.' })
+    ).toEqual({
       artifact: expect.objectContaining({
         content: expect.stringContaining('Trellis files are a projection.')
       })
@@ -103,22 +108,24 @@ describe('JrTrellisToolHost', () => {
     const discussing = await reachDiscussion(store)
     const host = new JrTrellisToolHost(store, { cardId: discussing.id, actor: worker })
 
-    expect(host.call('jr_card_request_transition', { transition: 'begin-planning' })).toEqual({
-      requested: 'begin-planning',
-      card: expect.objectContaining({ status: 'planning' })
-    })
-    expect(() =>
+    expect(await host.call('jr_card_request_transition', { transition: 'begin-planning' })).toEqual(
+      {
+        requested: 'begin-planning',
+        card: expect.objectContaining({ status: 'planning' })
+      }
+    )
+    await expect(
       host.call('jr_card_request_transition', { transition: 'request-execution-approval' })
-    ).toThrow('待批准执行')
-    expect(() =>
+    ).rejects.toThrow('待批准执行')
+    await expect(
       host.call('jr_card_request_transition', { transition: 'creating_worktree' })
-    ).toThrow('待批准执行')
+    ).rejects.toThrow('待批准执行')
     expect(store.readCard(discussing.id).status).toBe('planning')
 
     await reachExecuting(store, discussing.id)
     const executingHost = new JrTrellisToolHost(store, { cardId: discussing.id, actor: worker })
     expect(
-      executingHost.call('jr_card_request_transition', { transition: 'request-review' })
+      await executingHost.call('jr_card_request_transition', { transition: 'request-review' })
     ).toEqual({
       requested: 'request-review',
       card: expect.objectContaining({ status: 'executing' })
@@ -134,27 +141,94 @@ describe('JrTrellisToolHost', () => {
     const card = await reachPlanning(store)
     const host = new JrTrellisToolHost(store, { cardId: card.id, actor: worker })
 
-    expect(() =>
+    await expect(
       host.call('jr_artifact_upsert', { path: '.trellis/workflow.md', content: 'nope' })
-    ).toThrow('.trellis')
-    expect(() =>
+    ).rejects.toThrow('.trellis')
+    await expect(
       host.call('jr_artifact_upsert', {
         path: `tasks/${card.id}/../secret.md`,
         content: 'nope'
       })
-    ).toThrow('not writable')
+    ).rejects.toThrow('not writable')
     expect(
       store.readCard(card.id).artifacts.some((artifact) => artifact.path.includes('.trellis'))
     ).toBe(false)
   })
+
+  it('creates task/context/spec records and verifies hashed projections', async () => {
+    const store = await createStore()
+    const card = await reachPlanning(store)
+    const worktreePath = await mkdtemp(join(tmpdir(), 'orca-jr-projection-'))
+    temporaryDirectories.push(worktreePath)
+    const host = new JrTrellisToolHost(store, {
+      cardId: card.id,
+      actor: worker,
+      projection: createLocalJrProjectionWriter(worktreePath)
+    })
+
+    expect(
+      await host.call('jr_task_update', {
+        title: card.title,
+        summary: 'Keep recovery specific.',
+        acceptance: 'Users can resume from an expired invite.'
+      })
+    ).toEqual({
+      task: expect.objectContaining({ path: `tasks/${card.id}/task.md` }),
+      card: expect.objectContaining({ acceptance: 'Users can resume from an expired invite.' })
+    })
+    expect(
+      await host.call('jr_context_set', { content: '# Context\n\nFolder and git workspaces.\n' })
+    ).toEqual({
+      artifact: expect.objectContaining({ path: `tasks/${card.id}/context.md` })
+    })
+    expect(await host.call('jr_context_get', {})).toEqual({
+      context: expect.objectContaining({ content: expect.stringContaining('Folder and git') })
+    })
+    expect(
+      await host.call('jr_spec_propose', {
+        name: 'invite-recovery',
+        content: '# Invite recovery\n\nResume without creating a new worktree.\n'
+      })
+    ).toEqual({ spec: expect.objectContaining({ path: 'spec/invite-recovery.md' }) })
+
+    const synced = await host.call('jr_projection_sync', {})
+    expect(synced).toEqual({
+      synced: true,
+      canonicalStore: 'jr-sqlite',
+      manifest: expect.objectContaining({ cardId: card.id, version: 1 })
+    })
+    expect(await host.call('jr_projection_verify', {})).toEqual({
+      ok: true,
+      present: true,
+      manifest: expect.objectContaining({ cardId: card.id })
+    })
+
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(join(worktreePath, '.trellis', 'workflow.md'), 'tampered')
+    await expect(host.call('jr_projection_verify', {})).rejects.toThrow('hashes differ')
+  })
 })
 
 async function reachDiscussion(store: JrStore) {
-  const card = store.createCard({ title: 'Plan recovery with tools' }, controller)
+  const card = store.createCard(
+    {
+      title: 'Plan recovery with tools',
+      description: 'Define the recovery path when an invitation is no longer valid.'
+    },
+    controller
+  )
   store.updateCardConfiguration(card.id, { harness: 'codex', modelId: 'gpt-5.6-sol' }, controller)
   store.updateCardExecutionTarget(
     card.id,
     { repositoryId: 'repo-1', baseRef: 'main', setupDecision: 'skip' },
+    controller
+  )
+  store.updateCardDetails(
+    card.id,
+    {
+      acceptance: 'Recovery is specific, testable, and stays in the approved boundary.',
+      priority: 'p1'
+    },
     controller
   )
   return store.transition(card.id, 'begin-discussion', controller)

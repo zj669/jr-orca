@@ -17,13 +17,13 @@ import type { JrBoardSnapshot, JrCard, JrControllerActor } from '../../../../sha
 const LOCAL_CONTROLLER: JrControllerActor = { kind: 'human-controller', id: 'local-user' }
 
 const LANES: readonly { status: JrCard['status']; label: string; description: string }[] = [
-  { status: 'idea', label: '想法', description: '尚未授权 AI 工作' },
-  { status: 'discussion', label: '讨论中', description: '只读计划上下文' },
-  { status: 'planning', label: '规划中', description: 'Trellis Plan' },
+  { status: 'idea', label: '想法', description: '尚未授权 AI' },
+  { status: 'discussion', label: '讨论中', description: '无代码写入' },
+  { status: 'planning', label: '规划中', description: '同一 harness' },
   {
     status: 'pending_execution_approval',
     label: '待批准执行',
-    description: '计划已冻结'
+    description: '契约已冻结'
   },
   { status: 'creating_worktree', label: '创建工作树', description: 'Orca Create' },
   { status: 'executing', label: '执行中', description: 'Orca Work' },
@@ -35,7 +35,8 @@ const LANES: readonly { status: JrCard['status']; label: string; description: st
   },
   { status: 'shipping', label: '交付中', description: 'Orca Ship' },
   { status: 'merged', label: '已合并', description: 'Trellis Finish' },
-  { status: 'blocked', label: '受阻', description: '需要 controller 处理' }
+  { status: 'blocked', label: '受阻', description: '负责人与原因' },
+  { status: 'cancelled', label: '已取消', description: '不再推进' }
 ]
 
 type JrBoardDrawerProps = {
@@ -130,16 +131,18 @@ export default function JrBoardDrawer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full p-0 sm:max-w-[900px]"
+        className="flex h-full w-full flex-col overflow-hidden p-0 sm:max-w-[min(96vw,72rem)]"
+        data-jr-board=""
         onOpenAutoFocus={(event) => event.preventDefault()}
       >
         <SheetHeader className="border-b px-5 py-4 pr-14">
           <SheetTitle className="flex items-center gap-2">
             <CircleDot className="size-4 text-muted-foreground" />
-            JR Delivery Board
+            JR 交付看板
           </SheetTitle>
           <SheetDescription>
-            Trellis 数据保存在本地 JR 数据库；只有 controller 能批准执行和合并。
+            Trellis 数据保存在本地 JR 数据库；只有 controller 能批准执行和合并。Agent 不能写
+            .trellis/。
           </SheetDescription>
         </SheetHeader>
 
@@ -173,7 +176,7 @@ export default function JrBoardDrawer({
             </div>
           ) : null}
 
-          <div className="min-h-0 flex-1 overflow-auto scrollbar-sleek">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {loading && !snapshot ? (
               <div className="flex h-48 items-center justify-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" />
@@ -182,72 +185,91 @@ export default function JrBoardDrawer({
             ) : null}
 
             {snapshot ? (
-              <div className="min-w-[1980px] p-4">
-                <div className="grid grid-cols-11 gap-3">
-                  {LANES.map((lane) => {
-                    const cards = snapshot.cards.filter((card) => card.status === lane.status)
-                    return (
-                      <section
-                        key={lane.status}
-                        className="min-h-56 rounded-xl border bg-card p-3 text-card-foreground"
-                        aria-label={lane.label}
-                      >
-                        <div className="mb-3 flex items-start justify-between gap-2">
-                          <div>
-                            <h3 className="text-sm font-semibold">{lane.label}</h3>
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                              {lane.description}
-                            </p>
+              <>
+                <div className="shrink-0 overflow-x-auto border-b scrollbar-sleek">
+                  <div className="flex w-max gap-3 p-4">
+                    {LANES.map((lane) => {
+                      const cards = snapshot.cards.filter((card) => card.status === lane.status)
+                      return (
+                        <section
+                          key={lane.status}
+                          className="flex min-h-56 w-52 shrink-0 flex-col rounded-xl border bg-card p-3 text-card-foreground"
+                          aria-label={lane.label}
+                          data-jr-lane={lane.status}
+                        >
+                          <div className="mb-3 flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <h3 className="whitespace-nowrap text-sm font-semibold">
+                                {lane.label}
+                              </h3>
+                              <p className="mt-0.5 whitespace-nowrap text-xs text-muted-foreground">
+                                {lane.description}
+                              </p>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                              {cards.length}
+                            </span>
                           </div>
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                            {cards.length}
-                          </span>
-                        </div>
-                        <div className="space-y-2">
-                          {cards.map((card) => (
-                            <button
-                              key={card.id}
-                              type="button"
-                              onClick={() => setSelectedId(card.id)}
-                              className={cn(
-                                'w-full rounded-lg border bg-background p-3 text-left shadow-xs transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden',
-                                selectedCard?.id === card.id && 'border-ring'
-                              )}
-                            >
-                              <div className="line-clamp-2 text-sm font-medium">{card.title}</div>
-                              <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                                <span className="truncate">{card.harness ?? '未选择 AI 配置'}</span>
-                                <span>{formatUpdatedAt(card.updatedAt)}</span>
-                              </div>
-                              {worktreeStatusDescription(card) ? (
-                                <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
-                                  {worktreeStatusDescription(card)}
-                                </p>
-                              ) : null}
-                            </button>
-                          ))}
-                          {cards.length === 0 ? (
-                            <p className="py-6 text-center text-xs text-muted-foreground">
-                              暂无卡片
-                            </p>
-                          ) : null}
-                        </div>
-                      </section>
-                    )
-                  })}
+                          <div className="space-y-2">
+                            {cards.map((card) => (
+                              <button
+                                key={card.id}
+                                type="button"
+                                onClick={() => setSelectedId(card.id)}
+                                className={cn(
+                                  'w-full rounded-lg border bg-background p-3 text-left shadow-xs transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden',
+                                  selectedCard?.id === card.id && 'border-ring'
+                                )}
+                              >
+                                <div className="line-clamp-2 break-keep text-sm font-medium">
+                                  {card.title}
+                                </div>
+                                <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                                  <span className="min-w-0 truncate">
+                                    {card.priority ? `${card.priority.toUpperCase()} · ` : ''}
+                                    {card.harness ?? '未选择 AI 配置'}
+                                  </span>
+                                  <span className="shrink-0 whitespace-nowrap">
+                                    {formatUpdatedAt(card.updatedAt)}
+                                  </span>
+                                </div>
+                                {card.blocked ? (
+                                  <p className="mt-1 line-clamp-2 break-keep text-xs text-destructive">
+                                    {card.blocked.reason}
+                                  </p>
+                                ) : null}
+                                {worktreeStatusDescription(card) ? (
+                                  <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                                    {worktreeStatusDescription(card)}
+                                  </p>
+                                ) : null}
+                              </button>
+                            ))}
+                            {cards.length === 0 ? (
+                              <p className="py-6 text-center text-xs text-muted-foreground">
+                                暂无卡片
+                              </p>
+                            ) : null}
+                          </div>
+                        </section>
+                      )
+                    })}
+                  </div>
                 </div>
 
-                {selectedCard ? (
-                  <JrCardDetail
-                    card={selectedCard}
-                    harnesses={snapshot.harnesses}
-                    repositories={repositories}
-                    saving={saving}
-                    controller={LOCAL_CONTROLLER}
-                    runAction={(action) => void runAction(action)}
-                  />
-                ) : null}
-              </div>
+                <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-8 scrollbar-sleek">
+                  {selectedCard ? (
+                    <JrCardDetail
+                      card={selectedCard}
+                      harnesses={snapshot.harnesses}
+                      repositories={repositories}
+                      saving={saving}
+                      controller={LOCAL_CONTROLLER}
+                      runAction={(action) => void runAction(action)}
+                    />
+                  ) : null}
+                </div>
+              </>
             ) : null}
           </div>
         </div>

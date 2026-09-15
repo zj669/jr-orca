@@ -1,5 +1,5 @@
 const TASK_FILE_PATTERN =
-  /^(prd|design|implement|discussion|idea|journal|research|review|context)\.md$/
+  /^(prd|design|implement|discussion|idea|journal|research|review|context|task|acceptance)\.md$/
 const SPEC_FILE_PATTERN = /^spec\/[A-Za-z0-9._-]+\.md$/
 
 export function normalizeJrArtifactPath(path: string): string {

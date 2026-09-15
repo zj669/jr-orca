@@ -69,7 +69,7 @@ describe('JR card execution launch', () => {
       { id: 'repo-1::/worktree', path: '/worktree', branch: 'jr/launch' },
       controller
     )
-    expect(seedTrellisSession).toHaveBeenCalledWith('card-1', '/worktree')
+    expect(seedTrellisSession).toHaveBeenCalledWith('card-1', '/worktree', undefined)
     expect(seedTrellisSession.mock.invocationCallOrder[0]).toBeLessThan(
       launchAgent.mock.invocationCallOrder[0]
     )
@@ -182,6 +182,41 @@ describe('JR card execution launch', () => {
 
     expect(blockExecution).toHaveBeenCalledWith('card-1', 'base ref is unavailable', controller)
   })
+
+  it('reuses an existing folder workspace when native worktree creation fails', async () => {
+    const recordWorktreeCreated = vi.fn().mockResolvedValue(undefined)
+    const seedTrellisSession = vi.fn().mockResolvedValue(undefined)
+    const launchAgent = vi.fn().mockResolvedValue({
+      agent: 'cursor',
+      tabId: 'tab-1',
+      paneKey: 'tab-1:pane-1',
+      ptyId: 'pty-1'
+    })
+    const launcher = createJrCardExecutionLauncher({
+      ...idleDependencies(),
+      createWorktree: vi.fn().mockRejectedValue(new Error('folders have no git worktrees')),
+      recordWorktreeCreated,
+      seedTrellisSession,
+      launchAgent,
+      resolveExistingWorkspace: () => ({
+        id: 'folder-1',
+        path: '/project',
+        branch: 'HEAD',
+        connectionId: 'ssh-1',
+        kind: 'folder'
+      })
+    })
+
+    await launcher.launch(request.cardId, controller)
+
+    expect(recordWorktreeCreated).toHaveBeenCalledWith(
+      'card-1',
+      { id: 'folder-1', path: '/project', branch: 'HEAD' },
+      controller
+    )
+    expect(seedTrellisSession).toHaveBeenCalledWith('card-1', '/project', 'ssh-1')
+    expect(launchAgent).toHaveBeenCalled()
+  })
 })
 
 function idleDependencies() {
@@ -205,6 +240,7 @@ function idleDependencies() {
     recordAgentExit: vi.fn().mockResolvedValue(undefined),
     requestReviewOnSuccess: vi.fn().mockResolvedValue(undefined),
     blockExecution: vi.fn().mockResolvedValue(undefined),
+    resolveExistingWorkspace: () => null,
     createId: () => 'creation-test'
   }
 }

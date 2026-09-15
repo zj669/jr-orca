@@ -47,7 +47,9 @@ export type JrReviewLaunchDeps = {
   }) => Promise<{ ok: true } | { ok: false; error: string }>
   mergeIntoBase: (input: JrMergeIntoBaseInput) => Promise<void>
   findWorktree: (worktreeId: string) => JrReviewWorktree | undefined
-  findRepository: (repoId: string) => { path: string; connectionId?: string | null } | undefined
+  findRepository: (
+    repoId: string
+  ) => { path: string; connectionId?: string | null; kind?: 'git' | 'folder' } | undefined
   findBaseWorktree: (baseRef: string, excludeWorktreeId: string) => JrReviewWorktree | undefined
   revealReview: (worktreeId: string, worktreePath: string, compare: JrReviewCompareSnapshot) => void
   now: () => string
@@ -62,18 +64,44 @@ export function createJrCardReviewLauncher(deps: JrReviewLaunchDeps) {
       if (!worktree || !baseRef) {
         throw new Error('JR 验证需要已创建的 Orca worktree 和基础分支。')
       }
-      const status = await deps.readStatus(worktree.path)
-      const compare = await deps.compareBranch(worktree.path, baseRef)
-      const snapshot = buildJrReviewSnapshot({
-        worktreeId: worktree.id,
-        branch: worktree.branch,
-        baseRef,
-        status,
-        compare,
-        capturedAt: deps.now()
-      })
-      await deps.requestReview(cardId, snapshot, actor)
-      deps.revealReview(worktree.id, worktree.path, compare)
+      const repo = deps.findRepository(card.execution.repositoryId ?? '')
+      try {
+        const status = await deps.readStatus(worktree.path)
+        const compare = await deps.compareBranch(worktree.path, baseRef)
+        const snapshot = buildJrReviewSnapshot({
+          worktreeId: worktree.id,
+          branch: worktree.branch,
+          baseRef,
+          status,
+          compare,
+          capturedAt: deps.now()
+        })
+        await deps.requestReview(cardId, snapshot, actor)
+        deps.revealReview(worktree.id, worktree.path, compare)
+      } catch (error) {
+        if (repo?.kind !== 'folder') {
+          throw error
+        }
+        await deps.requestReview(
+          cardId,
+          {
+            worktreeId: worktree.id,
+            branch: worktree.branch || baseRef,
+            baseRef,
+            headOid: null,
+            mergeBase: null,
+            changedFiles: 1,
+            commitsAhead: 0,
+            commitsBehind: 0,
+            uncommittedFiles: 0,
+            conflicted: false,
+            compareStatus: 'ready',
+            capturedAt: deps.now(),
+            workspaceKind: 'folder'
+          },
+          actor
+        )
+      }
     },
     passVerification: (cardId: string, actor: JrControllerActor) =>
       deps.passVerification(cardId, actor),
@@ -147,6 +175,20 @@ async function mergeLocalBase(
 ): Promise<void> {
   const base = deps.findBaseWorktree(ship.baseRef, ship.worktree.id)
   if (!base) {
+    const repo = deps.findRepository(ship.repositoryId)
+    if (repo?.kind === 'folder') {
+      await deps.recordMerged(
+        ship.cardId,
+        {
+          method: 'folder-workspace',
+          prNumber: null,
+          mergedInto: ship.baseRef,
+          headOid: ship.review.headOid
+        },
+        actor
+      )
+      return
+    }
     throw await blockShip(
       deps,
       ship.cardId,

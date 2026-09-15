@@ -243,6 +243,11 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     load: async () => (await import('./handlers/vm.js')).VM_HANDLERS
   },
   {
+    name: 'jr',
+    keys: ['jr mcp', 'jr call', 'jr tools'],
+    load: async () => (await import('./handlers/jr.js')).JR_HANDLERS
+  },
+  {
     name: 'skill-sharing',
     keys: ['skills installed', 'skills share'],
     load: async () => (await import('./handlers/skill-sharing.js')).SKILL_SHARING_HANDLERS

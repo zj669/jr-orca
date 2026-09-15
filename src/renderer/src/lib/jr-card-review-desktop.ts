@@ -71,7 +71,12 @@ function desktopJrReviewDeps(): JrReviewLaunchDeps {
       const worktree = getIndexedWorktreeById(useAppStore.getState().worktreesByRepo, worktreeId)
       return worktree ? toJrReviewWorktree(worktree) : undefined
     },
-    findRepository: (repoId) => useAppStore.getState().repos.find((repo) => repo.id === repoId),
+    findRepository: (repoId) => {
+      const repo = useAppStore.getState().repos.find((item) => item.id === repoId)
+      return repo
+        ? { path: repo.path, connectionId: repo.connectionId, kind: repo.kind ?? 'git' }
+        : undefined
+    },
     findBaseWorktree: (baseRef, excludeWorktreeId) => {
       const { worktreesByRepo } = useAppStore.getState()
       const current = getIndexedWorktreeById(worktreesByRepo, excludeWorktreeId)

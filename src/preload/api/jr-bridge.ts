@@ -8,13 +8,18 @@ export const jrApi = {
     ipcRenderer.invoke('jr:updateCardConfiguration', cardId, input, actor),
   updateCardExecutionTarget: (cardId, input, actor) =>
     ipcRenderer.invoke('jr:updateCardExecutionTarget', cardId, input, actor),
+  updateCardDetails: (cardId, input, actor) =>
+    ipcRenderer.invoke('jr:updateCardDetails', cardId, input, actor),
+  rejectExecutionApproval: (cardId, actor) =>
+    ipcRenderer.invoke('jr:rejectExecutionApproval', cardId, actor),
+  resumeBlocked: (cardId, actor) => ipcRenderer.invoke('jr:resumeBlocked', cardId, actor),
   transitionCard: (cardId, transition, actor) =>
     ipcRenderer.invoke('jr:transitionCard', cardId, transition, actor),
   prepareExecution: (cardId, actor) => ipcRenderer.invoke('jr:prepareExecution', cardId, actor),
   recordWorktreeCreated: (cardId, input, actor) =>
     ipcRenderer.invoke('jr:recordWorktreeCreated', cardId, input, actor),
-  seedTrellisSession: (cardId, worktreePath) =>
-    ipcRenderer.invoke('jr:seedTrellisSession', cardId, worktreePath),
+  seedTrellisSession: (cardId, worktreePath, connectionId) =>
+    ipcRenderer.invoke('jr:seedTrellisSession', cardId, worktreePath, connectionId),
   recordWorktreeProgress: (cardId, phase, actor) =>
     ipcRenderer.invoke('jr:recordWorktreeProgress', cardId, phase, actor),
   recordAgentStarted: (cardId, input, actor) =>

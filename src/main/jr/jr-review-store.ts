@@ -9,6 +9,7 @@ import type {
 import { requireJrCardState } from './jr-card-transition-guards'
 import { jrTaskArtifactPath } from './jr-trellis-artifact-templates'
 import { jrNow, recordJrEvent, setJrCardStatus, upsertJrArtifact } from './jr-card-records'
+import { persistJrBlocked } from './jr-blocked-state'
 import { optionalJrDatabaseString, requireJrDatabaseRow } from './jr-database-records'
 
 const REVIEW_COLUMNS = [
@@ -50,6 +51,17 @@ export class JrReviewStore {
   passVerification(card: JrCard, actor: JrControllerActor): void {
     requireJrCardState(card, 'verifying', '通过验证')
     const snapshot = requireSnapshot(card)
+    if (snapshot.workspaceKind === 'folder') {
+      setJrCardStatus(this.db, card.id, 'pending_merge_approval')
+      recordJrEvent(
+        this.db,
+        card.id,
+        '等待合并审批',
+        '文件夹工作区已通过验证。没有 git 主工作树时仍可交付。',
+        actor
+      )
+      return
+    }
     if (snapshot.compareStatus !== 'ready') {
       throw new Error('Orca 分支对比尚未就绪，不能通过验证。')
     }
@@ -126,7 +138,9 @@ export class JrReviewStore {
       '已合并',
       delivery.method === 'hosted-pr'
         ? `Hosted PR ${delivery.prNumber} 已合并到 ${delivery.mergedInto}。`
-        : `已在基础 worktree 合并到 ${delivery.mergedInto}。`,
+        : delivery.method === 'folder-workspace'
+          ? `文件夹工作区已交付到 ${delivery.mergedInto}。`
+          : `已在基础 worktree 合并到 ${delivery.mergedInto}。`,
       actor
     )
   }
@@ -143,8 +157,7 @@ export class JrReviewStore {
     if (!detail) {
       throw new Error('请先为卡片设置 受阻原因。')
     }
-    setJrCardStatus(this.db, card.id, 'blocked')
-    recordJrEvent(this.db, card.id, '交付受阻', detail, actor)
+    persistJrBlocked(this.db, card, detail, actor, '交付受阻')
     return true
   }
 

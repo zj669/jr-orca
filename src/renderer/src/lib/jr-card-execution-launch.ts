@@ -1,7 +1,7 @@
 import { getWorkspaceSeedName } from '@/lib/new-workspace'
 import { launchAgentBackgroundSession } from '@/lib/launch-agent-background-session'
 import { useAppStore } from '@/store'
-import { jrHarnessAgent } from '../../../shared/jr/jr-harness-agent'
+import { jrHarnessAgent, type JrHarnessTuiAgent } from '../../../shared/jr/jr-harness-agent'
 import type {
   JrAgentLifecycleState,
   JrControllerActor,
@@ -9,7 +9,7 @@ import type {
   JrRecordAgentSessionInput,
   JrRecordWorktreeInput
 } from '../../../shared/jr/jr-types'
-import type { TuiAgent } from '../../../shared/tui-agent'
+import { findJrExistingWorkspace } from './jr-existing-workspace'
 
 type JrWorktreeProgress = {
   creationId?: string
@@ -21,7 +21,7 @@ type JrNativeWorktreeRequest = {
   baseRef: string
   setupDecision: JrExecutionLaunchRequest['execution']['setupDecision']
   title: string
-  agent: TuiAgent
+  agent: JrHarnessTuiAgent
   creationId: string
 }
 
@@ -49,7 +49,18 @@ type JrExecutionLaunchDependencies = {
     worktree: JrRecordWorktreeInput,
     actor: JrControllerActor
   ) => Promise<unknown>
-  seedTrellisSession: (cardId: string, worktreePath: string) => Promise<unknown>
+  seedTrellisSession: (
+    cardId: string,
+    worktreePath: string,
+    connectionId?: string | null
+  ) => Promise<unknown>
+  resolveExistingWorkspace: (repositoryId: string) => {
+    id: string
+    path: string
+    branch: string
+    connectionId?: string | null
+    kind: 'git' | 'folder'
+  } | null
   recordAgentStarted: (
     cardId: string,
     session: JrRecordAgentSessionInput,
@@ -83,16 +94,13 @@ export function createJrCardExecutionLauncher(dependencies: JrExecutionLaunchDep
         )
       })
       try {
-        const worktree = await dependencies.createWorktree({
-          repositoryId: request.execution.repositoryId,
-          baseRef: request.execution.baseRef,
-          setupDecision: request.execution.setupDecision,
-          title: request.title,
-          agent: jrHarnessAgent(request.harness),
+        const { worktree, connectionId } = await createJrExecutionWorktree(
+          dependencies,
+          request,
           creationId
-        })
+        )
         await dependencies.recordWorktreeCreated(request.cardId, worktree, actor)
-        await dependencies.seedTrellisSession(request.cardId, worktree.path)
+        await dependencies.seedTrellisSession(request.cardId, worktree.path, connectionId)
         const agent = jrHarnessAgent(request.harness)
         const session = await dependencies.launchAgent({
           agent,
@@ -200,7 +208,8 @@ export async function launchJrCardExecution(
       window.api.jr.recordWorktreeProgress(id, phase, controller),
     recordWorktreeCreated: (id, worktree, controller) =>
       window.api.jr.recordWorktreeCreated(id, worktree, controller),
-    seedTrellisSession: (id, worktreePath) => window.api.jr.seedTrellisSession(id, worktreePath),
+    seedTrellisSession: (id, worktreePath, connectionId) =>
+      window.api.jr.seedTrellisSession(id, worktreePath, connectionId),
     recordAgentStarted: (id, session, controller) =>
       window.api.jr.recordAgentStarted(id, session, controller),
     recordAgentStatus: (id, status, controller) =>
@@ -212,6 +221,15 @@ export async function launchJrCardExecution(
     },
     blockExecution: (id, reason, controller) =>
       window.api.jr.blockExecution(id, reason, controller),
+    resolveExistingWorkspace: (repositoryId) => {
+      const state = useAppStore.getState()
+      return findJrExistingWorkspace({
+        repositoryId,
+        repos: state.repos,
+        worktrees: Object.values(state.worktreesByRepo).flat(),
+        folderWorkspaces: state.folderWorkspaces
+      })
+    },
     createId: () => crypto.randomUUID()
   })
   await launcher.launch(cardId, actor)
@@ -219,6 +237,42 @@ export async function launchJrCardExecution(
 
 function reportJrLifecycle(promise: Promise<unknown>, event: string): void {
   void promise.catch((error: unknown) => console.error(`JR failed to record ${event}`, error))
+}
+
+async function createJrExecutionWorktree(
+  dependencies: JrExecutionLaunchDependencies,
+  request: JrExecutionLaunchRequest,
+  creationId: string
+): Promise<{
+  worktree: JrRecordWorktreeInput
+  connectionId?: string | null
+}> {
+  const existing = dependencies.resolveExistingWorkspace(request.execution.repositoryId)
+  try {
+    return {
+      worktree: await dependencies.createWorktree({
+        repositoryId: request.execution.repositoryId,
+        baseRef: request.execution.baseRef,
+        setupDecision: request.execution.setupDecision,
+        title: request.title,
+        agent: jrHarnessAgent(request.harness),
+        creationId
+      }),
+      connectionId: existing?.connectionId
+    }
+  } catch (error) {
+    if (!existing) {
+      throw error
+    }
+    return {
+      worktree: {
+        id: existing.id,
+        path: existing.path,
+        branch: existing.branch
+      },
+      connectionId: existing.connectionId
+    }
+  }
 }
 
 async function completeSuccessfulHarnessExit(

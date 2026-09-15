@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto'
-import type SyncDatabase from '../sqlite/sync-database'
 import {
   isJrHarness,
   JR_HARNESS_CATALOG,
@@ -15,42 +13,39 @@ import {
   type JrRecordWorktreeInput,
   type JrReviewSnapshot,
   type JrShipRequest,
+  type JrUpdateCardDetailsInput,
   type JrUpdateCardInput,
   type JrUpdateExecutionTargetInput,
   type JrAgentLifecycleState
 } from '../../shared/jr/jr-types'
-import {
-  requireJrActor,
-  requireJrAiConfiguration,
-  requireJrCardState,
-  requireJrController
-} from './jr-card-transition-guards'
-import { buildJrPlanningArtifacts, jrTaskArtifactPath } from './jr-trellis-artifact-templates'
+import { requireJrActor, requireJrController } from './jr-card-transition-guards'
 import {
   getJrCard,
   JR_CARD_SELECT_COLUMNS,
   jrNow,
   readJrCard,
   recordJrEvent,
-  setJrCardStatus,
   upsertJrArtifact
 } from './jr-card-records'
 import { requireJrDatabaseRow } from './jr-database-records'
 import { JrExecutionStore } from './jr-execution-store'
 import { JrReviewStore } from './jr-review-store'
+import { JrLifecycleStore } from './jr-lifecycle-store'
 import { openJrSqlite } from './jr-store-schema'
 
 const CONFIGURABLE_STATUSES = new Set<JrCard['status']>(['idea', 'discussion', 'planning'])
 
 export class JrStore {
-  private readonly db: SyncDatabase
+  private readonly db: ReturnType<typeof openJrSqlite>
   private readonly execution: JrExecutionStore
   private readonly review: JrReviewStore
+  private readonly lifecycle: JrLifecycleStore
 
   constructor(databasePath: string) {
     this.db = openJrSqlite(databasePath)
     this.execution = new JrExecutionStore(this.db)
     this.review = new JrReviewStore(this.db)
+    this.lifecycle = new JrLifecycleStore(this.db)
     this.ensureDemoCard()
   }
 
@@ -75,32 +70,7 @@ export class JrStore {
   }
 
   createCard(input: JrCreateCardInput, actor: JrControllerActor): JrCard {
-    requireJrController(actor)
-    const title = input.title.trim()
-    const description = input.description?.trim() || '补充问题、预期结果和验收标准。'
-    if (title.length < 2 || title.length > 160) {
-      throw new Error('JR 卡片标题需要在 2 到 160 个字符之间。')
-    }
-    if (description.length > 2_000) {
-      throw new Error('JR 卡片说明不能超过 2000 个字符。')
-    }
-    const timestamp = jrNow()
-    const id = randomUUID()
-    this.db
-      .prepare(
-        `INSERT INTO jr_cards (
-          id, title, description, status, harness, model_id, model_label, created_at, updated_at
-        ) VALUES (?, ?, ?, 'idea', NULL, NULL, NULL, ?, ?)`
-      )
-      .run(id, title, description, timestamp, timestamp)
-    upsertJrArtifact(
-      this.db,
-      id,
-      jrTaskArtifactPath(id, 'idea.md'),
-      `# ${title}\n\n${description}\n`,
-      actor
-    )
-    recordJrEvent(this.db, id, '卡片已创建', '想法已记录，尚未授权 AI 讨论或执行。', actor)
+    const id = this.lifecycle.createCard(input, actor)
     return this.readCard(id)
   }
 
@@ -130,59 +100,13 @@ export class JrStore {
       )
       .run(harness.id, model.id, model.label, jrNow(), cardId)
     recordJrEvent(this.db, cardId, 'AI 配置已更新', `${harness.label} · ${model.label}`, actor)
+    const updated = this.readCard(cardId)
+    this.lifecycle.invalidatePlanIfNeeded(card, updated, actor)
     return this.readCard(cardId)
   }
 
   transition(cardId: string, transition: JrCardTransition, actor: JrActor): JrCard {
-    requireJrActor(actor)
-    const card = this.readCard(cardId)
-    if (transition === 'begin-discussion') {
-      requireJrCardState(card, 'idea', '开始讨论')
-      requireJrAiConfiguration(card)
-      setJrCardStatus(this.db, cardId, 'discussion')
-      upsertJrArtifact(
-        this.db,
-        cardId,
-        jrTaskArtifactPath(cardId, 'discussion.md'),
-        `# Discussion\n\nHarness: ${card.harness}\nModel: ${card.model?.label}\n\nCapture decisions using JR-backed artifacts before planning.\n`,
-        actor
-      )
-      recordJrEvent(
-        this.db,
-        cardId,
-        '讨论已开始',
-        '已绑定卡片的 harness 与模型；该阶段不授权代码写入。',
-        actor
-      )
-    } else if (transition === 'begin-planning') {
-      requireJrCardState(card, 'discussion', '进入规划')
-      requireJrAiConfiguration(card)
-      setJrCardStatus(this.db, cardId, 'planning')
-      const plannedCard = this.readCard(cardId)
-      for (const artifact of buildJrPlanningArtifacts(plannedCard)) {
-        upsertJrArtifact(this.db, cardId, artifact.path, artifact.content, actor)
-      }
-      recordJrEvent(
-        this.db,
-        cardId,
-        '规划已开始',
-        'Trellis PRD、设计和实施计划已存入 JR 数据库。',
-        actor
-      )
-    } else {
-      requireJrController(actor)
-      requireJrCardState(card, 'planning', '提交执行审批')
-      requireJrAiConfiguration(card)
-      this.execution.requireTarget(card)
-      setJrCardStatus(this.db, cardId, 'pending_execution_approval')
-      recordJrEvent(
-        this.db,
-        cardId,
-        '等待执行审批',
-        '控制器已冻结计划。只有明确批准才能创建 Orca worktree。',
-        actor
-      )
-    }
+    this.lifecycle.transition(this.readCard(cardId), transition, actor)
     return this.readCard(cardId)
   }
 
@@ -285,22 +209,36 @@ export class JrStore {
     return this.readCard(cardId)
   }
 
-  private ensureDemoCard(): void {
-    const row = this.db.prepare('SELECT id FROM jr_cards LIMIT 1').get()
-    if (row !== undefined) {
-      return
-    }
-    this.createCard(
-      {
-        title: '梳理邀请链接失效后的恢复体验',
-        description: '讨论用户遇到失效邀请链接时的恢复路径，并在规划中写出可验证的交付边界。'
-      },
-      { kind: 'human-controller', id: 'local-user' }
-    )
+  updateCardDetails(
+    cardId: string,
+    input: JrUpdateCardDetailsInput,
+    actor: JrControllerActor
+  ): JrCard {
+    requireJrController(actor)
+    this.lifecycle.updateDetails(this.readCard(cardId), input, actor)
+    return this.readCard(cardId)
   }
 
-  readCard(cardId: string): JrCard {
-    return getJrCard(this.db, cardId)
+  rejectExecutionApproval(cardId: string, actor: JrControllerActor): JrCard {
+    requireJrController(actor)
+    this.lifecycle.rejectExecutionApproval(this.readCard(cardId), actor)
+    return this.readCard(cardId)
+  }
+
+  resumeBlocked(cardId: string, actor: JrControllerActor): JrCard {
+    requireJrController(actor)
+    this.lifecycle.resumeBlocked(this.readCard(cardId), actor)
+    return this.readCard(cardId)
+  }
+
+  writeTaskRecord(
+    cardId: string,
+    input: { title?: string; summary?: string; acceptance?: string },
+    actor: JrActor
+  ): JrCard {
+    requireJrActor(actor)
+    this.lifecycle.writeTaskRecord(this.readCard(cardId), input, actor)
+    return this.readCard(cardId)
   }
 
   writeArtifact(cardId: string, path: string, content: string, actor: JrActor): JrCard {
@@ -315,5 +253,23 @@ export class JrStore {
     this.readCard(cardId)
     recordJrEvent(this.db, cardId, kind, detail, actor)
     return this.readCard(cardId)
+  }
+
+  readCard(cardId: string): JrCard {
+    return getJrCard(this.db, cardId)
+  }
+
+  private ensureDemoCard(): void {
+    const row = this.db.prepare('SELECT id FROM jr_cards LIMIT 1').get()
+    if (row !== undefined) {
+      return
+    }
+    this.createCard(
+      {
+        title: '梳理邀请链接失效后的恢复体验',
+        description: '讨论用户遇到失效邀请链接时的恢复路径，并在规划中写出可验证的交付边界。'
+      },
+      { kind: 'human-controller', id: 'local-user' }
+    )
   }
 }

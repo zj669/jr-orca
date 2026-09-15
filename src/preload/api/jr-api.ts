@@ -12,6 +12,7 @@ import type {
   JrRecordWorktreeInput,
   JrReviewSnapshot,
   JrShipRequest,
+  JrUpdateCardDetailsInput,
   JrUpdateCardInput,
   JrUpdateExecutionTargetInput
 } from '../../shared/jr/jr-types'
@@ -29,6 +30,13 @@ export type JrApi = {
     input: JrUpdateExecutionTargetInput,
     actor: JrControllerActor
   ) => Promise<JrCard>
+  updateCardDetails: (
+    cardId: string,
+    input: JrUpdateCardDetailsInput,
+    actor: JrControllerActor
+  ) => Promise<JrCard>
+  rejectExecutionApproval: (cardId: string, actor: JrControllerActor) => Promise<JrCard>
+  resumeBlocked: (cardId: string, actor: JrControllerActor) => Promise<JrCard>
   transitionCard: (
     cardId: string,
     transition: JrCardTransition,
@@ -40,7 +48,11 @@ export type JrApi = {
     input: JrRecordWorktreeInput,
     actor: JrControllerActor
   ) => Promise<JrCard>
-  seedTrellisSession: (cardId: string, worktreePath: string) => Promise<string[]>
+  seedTrellisSession: (
+    cardId: string,
+    worktreePath: string,
+    connectionId?: string | null
+  ) => Promise<string[]>
   recordWorktreeProgress: (
     cardId: string,
     phase: 'fetching' | 'creating',

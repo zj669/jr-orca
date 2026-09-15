@@ -12,6 +12,7 @@ import type {
 import { requireJrAiConfiguration, requireJrCardState } from './jr-card-transition-guards'
 import { jrTaskArtifactPath, buildJrExecutionPrompt } from './jr-trellis-artifact-templates'
 import { jrNow, recordJrEvent, setJrCardStatus } from './jr-card-records'
+import { persistJrBlocked } from './jr-blocked-state'
 import { optionalJrDatabaseString, requireJrDatabaseRow } from './jr-database-records'
 
 const TARGET_CONFIGURABLE_STATUSES = new Set<JrCard['status']>(['idea', 'discussion', 'planning'])
@@ -170,8 +171,7 @@ export class JrExecutionStore {
       .prepare('UPDATE jr_cards SET agent_status = ?, updated_at = ? WHERE id = ?')
       .run(status, jrNow(), card.id)
     if (status === 'blocked') {
-      setJrCardStatus(this.db, card.id, 'blocked')
-      recordJrEvent(this.db, card.id, 'Harness 报告受阻', 'Agent lifecycle 报告 blocked。', actor)
+      persistJrBlocked(this.db, card, 'Agent lifecycle 报告 blocked。', actor, 'Harness 报告受阻')
     }
   }
 
@@ -179,8 +179,7 @@ export class JrExecutionStore {
     if (card.status !== 'creating_worktree' && card.status !== 'executing') {
       return
     }
-    setJrCardStatus(this.db, card.id, 'blocked')
-    recordJrEvent(this.db, card.id, '执行受阻', requireText(reason, '受阻原因'), actor)
+    persistJrBlocked(this.db, card, reason, actor, '执行受阻')
   }
 
   recordAgentExit(card: JrCard, code: number, actor: JrControllerActor): void {

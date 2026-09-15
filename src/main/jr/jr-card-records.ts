@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type SyncDatabase from '../sqlite/sync-database'
 import {
+  isJrCardPriority,
   isJrDeliveryRecord,
   isJrHarness,
   isJrReviewSnapshot,
@@ -18,14 +19,16 @@ import {
   type JrDatabaseRow
 } from './jr-database-records'
 import { listJrCardArtifacts, listJrCardEvents } from './jr-card-history-reader'
+import { isJrResumableStatus } from './jr-blocked-state'
 
 export function jrNow(): string {
   return new Date().toISOString()
 }
 
-export const JR_CARD_SELECT_COLUMNS = `id, title, description, status, harness, model_id, model_label, repository_id, base_ref,
-                setup_decision, worktree_id, worktree_path, worktree_branch, worktree_phase, agent_type,
-                agent_tab_id, agent_pane_key, agent_pty_id, agent_status, review_json, delivery_json,
+export const JR_CARD_SELECT_COLUMNS = `id, title, description, acceptance, priority, status, harness, model_id, model_label,
+                repository_id, base_ref, setup_decision, worktree_id, worktree_path, worktree_branch,
+                worktree_phase, agent_type, agent_tab_id, agent_pane_key, agent_pty_id, agent_status,
+                review_json, delivery_json, blocked_from_status, blocked_reason, blocked_owner,
                 created_at, updated_at`
 
 export function getJrCard(db: SyncDatabase, cardId: string): JrCard {
@@ -38,6 +41,10 @@ export function getJrCard(db: SyncDatabase, cardId: string): JrCard {
 
 export function readJrCard(db: SyncDatabase, row: JrDatabaseRow): JrCard {
   const id = requireJrDatabaseString(row, 'id')
+  const blockedFrom = optionalJrDatabaseString(row, 'blocked_from_status')
+  const blockedReason = optionalJrDatabaseString(row, 'blocked_reason')
+  const blockedOwner = optionalJrDatabaseString(row, 'blocked_owner')
+  const priorityValue = optionalJrDatabaseString(row, 'priority')
   const harnessValue = optionalJrDatabaseString(row, 'harness')
   const modelId = optionalJrDatabaseString(row, 'model_id')
   const modelLabel = optionalJrDatabaseString(row, 'model_label')
@@ -57,6 +64,8 @@ export function readJrCard(db: SyncDatabase, row: JrDatabaseRow): JrCard {
     id,
     title: requireJrDatabaseString(row, 'title'),
     description: requireJrDatabaseString(row, 'description'),
+    acceptance: optionalJrDatabaseString(row, 'acceptance') ?? '',
+    priority: priorityValue && isJrCardPriority(priorityValue) ? priorityValue : null,
     status: requireJrDatabaseCardStatus(row),
     harness: harnessValue && isJrHarness(harnessValue) ? harnessValue : null,
     model,
@@ -86,6 +95,14 @@ export function readJrCard(db: SyncDatabase, row: JrDatabaseRow): JrCard {
     },
     review: readJrJson(optionalJrDatabaseString(row, 'review_json'), isJrReviewSnapshot),
     delivery: readJrJson(optionalJrDatabaseString(row, 'delivery_json'), isJrDeliveryRecord),
+    blocked:
+      blockedFrom && blockedReason && blockedOwner
+        ? {
+            fromStatus: isJrResumableStatus(blockedFrom) ? blockedFrom : 'planning',
+            reason: blockedReason,
+            owner: blockedOwner
+          }
+        : null,
     createdAt: requireJrDatabaseString(row, 'created_at'),
     updatedAt: requireJrDatabaseString(row, 'updated_at'),
     artifacts: listJrCardArtifacts(db, id),

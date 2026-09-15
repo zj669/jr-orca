@@ -7,6 +7,11 @@ export function pickRemoteCliEnv(env: NodeJS.ProcessEnv): Record<string, string>
     'ORCA_AGENT_LAUNCH_TOKEN',
     'ORCA_WORKSPACE_ID',
     'ORCA_USER_DATA_PATH',
+    'JR_CARD_ID',
+    'JR_DB_PATH',
+    'JR_ACTOR_ID',
+    'JR_ACTOR_KIND',
+    'JR_WORKTREE_PATH',
     'PATH',
     'Path'
   ]) {

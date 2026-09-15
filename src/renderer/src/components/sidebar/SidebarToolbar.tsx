@@ -87,7 +87,7 @@ const SidebarToolbar = React.memo(function SidebarToolbar({
                 variant={jrBoardOpen ? 'secondary' : 'ghost'}
                 size="icon-xs"
                 type="button"
-                aria-label="JR Delivery Board"
+                aria-label="JR 交付看板"
                 aria-pressed={jrBoardOpen}
                 onClick={onJrBoardToggle}
                 className="text-muted-foreground"
@@ -96,7 +96,7 @@ const SidebarToolbar = React.memo(function SidebarToolbar({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top" sideOffset={4}>
-              {jrBoardOpen ? 'Close JR Delivery Board' : 'Open JR Delivery Board'}
+              {jrBoardOpen ? '关闭 JR 交付看板' : '打开 JR 交付看板'}
             </TooltipContent>
           </Tooltip>
           <Tooltip open={workspaceBoardMovedHintOpen ? true : undefined}>

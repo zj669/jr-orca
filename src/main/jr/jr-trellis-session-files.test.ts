@@ -2,8 +2,13 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { seedJrTrellisSessionFiles } from './jr-trellis-session-files'
-import { JR_TRELLIS_IMPLEMENT_SKILL, JR_TRELLIS_PLAN_SKILL } from './jr-trellis-skill-guides'
+import { createRemoteSessionWriter, seedJrTrellisSessionFiles } from './jr-trellis-session-files'
+import {
+  JR_TRELLIS_CHECK_SKILL,
+  JR_TRELLIS_FINISH_SKILL,
+  JR_TRELLIS_IMPLEMENT_SKILL,
+  JR_TRELLIS_PLAN_SKILL
+} from './jr-trellis-skill-guides'
 
 const temporaryDirectories: string[] = []
 
@@ -16,7 +21,7 @@ afterEach(async () => {
 })
 
 describe('JR Trellis session files', () => {
-  it('seeds MCP configs and plan/implement skills without creating .trellis', async () => {
+  it('seeds MCP configs and plan/implement/check/finish skills without creating .trellis', async () => {
     const worktreePath = await mkdtemp(join(tmpdir(), 'orca-jr-session-'))
     temporaryDirectories.push(worktreePath)
     await writeFile(
@@ -24,7 +29,7 @@ describe('JR Trellis session files', () => {
       `${JSON.stringify({ mcpServers: { other: { command: 'echo' } } }, null, 2)}\n`
     )
 
-    const written = seedJrTrellisSessionFiles({
+    const written = await seedJrTrellisSessionFiles({
       worktreePath,
       cardId: 'card-1',
       mcp: {
@@ -45,7 +50,9 @@ describe('JR Trellis session files', () => {
         '.mcp.json',
         join('.cursor', 'mcp.json'),
         join('.agents', 'skills', 'jr-trellis-plan', 'SKILL.md'),
-        join('.claude', 'skills', 'jr-trellis-implement', 'SKILL.md')
+        join('.claude', 'skills', 'jr-trellis-implement', 'SKILL.md'),
+        join('.cursor', 'skills', 'jr-trellis-check', 'SKILL.md'),
+        join('.agents', 'skills', 'jr-trellis-finish', 'SKILL.md')
       ])
     )
 
@@ -66,18 +73,53 @@ describe('JR Trellis session files', () => {
         'utf8'
       )
     ).toBe(JR_TRELLIS_IMPLEMENT_SKILL)
+    expect(
+      await readFile(
+        join(worktreePath, '.claude', 'skills', 'jr-trellis-check', 'SKILL.md'),
+        'utf8'
+      )
+    ).toBe(JR_TRELLIS_CHECK_SKILL)
+    expect(
+      await readFile(
+        join(worktreePath, '.cursor', 'skills', 'jr-trellis-finish', 'SKILL.md'),
+        'utf8'
+      )
+    ).toBe(JR_TRELLIS_FINISH_SKILL)
     await expect(readFile(join(worktreePath, '.trellis', 'workflow.md'), 'utf8')).rejects.toThrow()
   })
 
-  it('skips seeding when the worktree path is not a local directory', async () => {
+  it('throws when the worktree path is not a local directory and no remote writer is provided', async () => {
     const missing = join(tmpdir(), 'orca-jr-missing-worktree')
-    expect(
+    await expect(
       seedJrTrellisSessionFiles({
         worktreePath: missing,
         cardId: 'card-1',
         mcp: { command: 'node', args: ['jr-mcp-stdio.js'], env: {} }
       })
-    ).toEqual([])
+    ).rejects.toThrow('no remote filesystem')
+  })
+
+  it('writes through a remote session writer and awaits async IO', async () => {
+    const files = new Map<string, string>()
+    let pending = 0
+    const writer = createRemoteSessionWriter('/remote/worktree', true, {
+      writeFile: async (absolutePath, content) => {
+        pending += 1
+        await Promise.resolve()
+        files.set(absolutePath, content)
+        pending -= 1
+      },
+      readFile: async (absolutePath) => files.get(absolutePath) ?? null
+    })
+    const written = await seedJrTrellisSessionFiles({
+      worktreePath: '/remote/worktree',
+      cardId: 'card-1',
+      writer,
+      mcp: { command: 'node', args: ['jr-mcp-bridge.cjs'], env: { JR_CARD_ID: 'card-1' } }
+    })
+    expect(pending).toBe(0)
+    expect(written.length).toBeGreaterThan(0)
+    expect(files.get('/remote/worktree/.mcp.json')).toContain('jr-trellis')
   })
 
   it('does not overwrite a worktree MCP file that is not valid JSON', async () => {
@@ -86,7 +128,7 @@ describe('JR Trellis session files', () => {
     await mkdir(join(worktreePath, '.cursor'), { recursive: true })
     await writeFile(join(worktreePath, '.mcp.json'), '{not json')
 
-    seedJrTrellisSessionFiles({
+    await seedJrTrellisSessionFiles({
       worktreePath,
       cardId: 'card-1',
       mcp: { command: 'node', args: ['jr-mcp-stdio.js'], env: { JR_CARD_ID: 'card-1' } }

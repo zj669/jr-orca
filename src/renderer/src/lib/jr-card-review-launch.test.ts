@@ -29,6 +29,8 @@ const executingCard: JrCard = {
   id: 'card-1',
   title: 'Review launch',
   description: 'Ship the change',
+  acceptance: 'Diff is reviewable and mergeable.',
+  priority: 'p1',
   status: 'executing',
   harness: 'cursorcli',
   model: { id: 'auto', label: 'Auto', capabilitySource: 'orca-session-catalog' },
@@ -48,6 +50,7 @@ const executingCard: JrCard = {
   },
   review: null,
   delivery: null,
+  blocked: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
   artifacts: [],
@@ -175,6 +178,46 @@ describe('JR card review launch', () => {
 
     await expect(launcher.approveMerge('card-1', controller)).rejects.toThrow('PR is conflicting')
     expect(blockExecution).toHaveBeenCalledWith('card-1', 'PR is conflicting', controller)
+  })
+
+  it('verifies a folder workspace when git status is unavailable', async () => {
+    const requestReview = vi.fn().mockResolvedValue(undefined)
+    const launcher = createJrCardReviewLauncher({
+      ...idleDependencies(),
+      getCard: vi.fn().mockResolvedValue(executingCard),
+      requestReview,
+      findRepository: vi.fn().mockReturnValue({ path: '/project', kind: 'folder' }),
+      readStatus: vi.fn().mockRejectedValue(new Error('not a git repository')),
+      compareBranch: vi.fn().mockRejectedValue(new Error('not a git repository'))
+    })
+
+    await launcher.requestReview('card-1', controller)
+
+    expect(requestReview).toHaveBeenCalledWith(
+      'card-1',
+      expect.objectContaining({ workspaceKind: 'folder', compareStatus: 'ready' }),
+      controller
+    )
+  })
+
+  it('records folder-workspace delivery when there is no PR or base worktree', async () => {
+    const recordMerged = vi.fn().mockResolvedValue(undefined)
+    const launcher = createJrCardReviewLauncher({
+      ...idleDependencies(),
+      prepareShip: vi.fn().mockResolvedValue(ship),
+      recordMerged,
+      findPullRequest: vi.fn().mockResolvedValue(null),
+      findBaseWorktree: vi.fn().mockReturnValue(undefined),
+      findRepository: vi.fn().mockReturnValue({ path: '/project', kind: 'folder' })
+    })
+
+    await launcher.approveMerge('card-1', controller)
+
+    expect(recordMerged).toHaveBeenCalledWith(
+      'card-1',
+      expect.objectContaining({ method: 'folder-workspace', mergedInto: 'main' }),
+      controller
+    )
   })
 
   it('prefers the worktree whose branch matches the card base ref', () => {

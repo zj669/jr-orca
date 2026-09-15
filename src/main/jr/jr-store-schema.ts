@@ -30,6 +30,11 @@ export function openJrSqlite(databasePath: string): SyncDatabase {
         agent_pane_key TEXT,
         agent_pty_id TEXT,
         agent_status TEXT,
+        acceptance TEXT NOT NULL DEFAULT '',
+        priority TEXT,
+        blocked_from_status TEXT,
+        blocked_reason TEXT,
+        blocked_owner TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -65,6 +70,7 @@ export function openJrSqlite(databasePath: string): SyncDatabase {
       );
     `)
   ensureJrArtifactRevisionSchema(db)
+  ensureJrCardContractSchema(db)
   return db
 }
 
@@ -80,5 +86,30 @@ export function ensureJrArtifactRevisionSchema(db: SyncDatabase): void {
   )
   if (!columns.has('version')) {
     db.exec('ALTER TABLE jr_artifacts ADD COLUMN version INTEGER NOT NULL DEFAULT 1')
+  }
+}
+
+const CARD_CONTRACT_COLUMNS = [
+  { name: 'acceptance', definition: "TEXT NOT NULL DEFAULT ''" },
+  { name: 'priority', definition: 'TEXT' },
+  { name: 'blocked_from_status', definition: 'TEXT' },
+  { name: 'blocked_reason', definition: 'TEXT' },
+  { name: 'blocked_owner', definition: 'TEXT' }
+] as const
+
+export function ensureJrCardContractSchema(db: SyncDatabase): void {
+  const columns = new Set(
+    db
+      .prepare('PRAGMA table_info(jr_cards)')
+      .all()
+      .map(
+        (row) =>
+          optionalJrDatabaseString(requireJrDatabaseRow(row, 'JR schema is invalid.'), 'name') ?? ''
+      )
+  )
+  for (const column of CARD_CONTRACT_COLUMNS) {
+    if (!columns.has(column.name)) {
+      db.exec(`ALTER TABLE jr_cards ADD COLUMN ${column.name} ${column.definition}`)
+    }
   }
 }

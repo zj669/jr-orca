@@ -1,4 +1,15 @@
 import { getAgentSessionOptionCatalog } from '../agent-session-option-catalog'
+import type { JrBlockedState, JrCardPriority } from './jr-card-contract'
+
+export type { JrBlockedState, JrCardPriority, JrUpdateCardDetailsInput } from './jr-card-contract'
+export {
+  assertJrExecutionContract,
+  isJrBlockedState,
+  isJrCardPriority,
+  jrExecutionContractIssues,
+  JR_CARD_PRIORITIES,
+  JR_PLACEHOLDER_DESCRIPTION
+} from './jr-card-contract'
 
 export const JR_HARNESSES = ['cursorcli', 'claude', 'codex', 'gemini'] as const
 export type JrHarness = (typeof JR_HARNESSES)[number]
@@ -74,9 +85,10 @@ export type JrReviewSnapshot = {
   conflicted: boolean
   compareStatus: JrCompareStatus
   capturedAt: string
+  workspaceKind?: 'git' | 'folder'
 }
 
-export const JR_DELIVERY_METHODS = ['hosted-pr', 'local-base-merge'] as const
+export const JR_DELIVERY_METHODS = ['hosted-pr', 'local-base-merge', 'folder-workspace'] as const
 export type JrDeliveryMethod = (typeof JR_DELIVERY_METHODS)[number]
 
 export type JrDeliveryRecord = {
@@ -106,12 +118,15 @@ export type JrCard = {
   id: string
   title: string
   description: string
+  acceptance: string
+  priority: JrCardPriority | null
   status: JrCardStatus
   harness: JrHarness | null
   model: JrModelChoice | null
   execution: JrExecutionState
   review: JrReviewSnapshot | null
   delivery: JrDeliveryRecord | null
+  blocked: JrBlockedState | null
   createdAt: string
   updatedAt: string
   artifacts: JrArtifact[]
@@ -255,7 +270,10 @@ export function isJrReviewSnapshot(value: unknown): value is JrReviewSnapshot {
     typeof value.uncommittedFiles === 'number' &&
     typeof value.conflicted === 'boolean' &&
     isJrCompareStatus(value.compareStatus) &&
-    typeof value.capturedAt === 'string'
+    typeof value.capturedAt === 'string' &&
+    (value.workspaceKind === undefined ||
+      value.workspaceKind === 'git' ||
+      value.workspaceKind === 'folder')
   )
 }
 

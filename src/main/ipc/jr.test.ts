@@ -64,7 +64,7 @@ describe('JR IPC', () => {
     const store = await createStore()
     registerJrHandlers(store)
 
-    expect(ipcHandleMock).toHaveBeenCalledTimes(19)
+    expect(ipcHandleMock).toHaveBeenCalledTimes(22)
 
     await invoke(
       'jr:createCard',
@@ -97,6 +97,16 @@ describe('JR IPC', () => {
       undefined,
       card.id,
       { repositoryId: 'repo-1', baseRef: 'main', setupDecision: 'inherit' },
+      { kind: 'human-controller', id: 'walker' }
+    )
+    await invoke(
+      'jr:updateCardDetails',
+      undefined,
+      card.id,
+      {
+        acceptance: 'Recovery is specific, testable, and stays in the approved boundary.',
+        priority: 'p1'
+      },
       { kind: 'human-controller', id: 'walker' }
     )
 
@@ -138,7 +148,10 @@ describe('JR IPC', () => {
     const store = await createStore()
     registerJrHandlers(store)
     const card = store.createCard(
-      { title: 'Launch validation' },
+      {
+        title: 'Launch validation',
+        description: 'Define the recovery path when an invitation is no longer valid.'
+      },
       { kind: 'human-controller', id: 'walker' }
     )
     store.updateCardConfiguration(
@@ -152,6 +165,14 @@ describe('JR IPC', () => {
     store.updateCardExecutionTarget(
       card.id,
       { repositoryId: 'repo-1', baseRef: 'main', setupDecision: 'inherit' },
+      { kind: 'human-controller', id: 'walker' }
+    )
+    store.updateCardDetails(
+      card.id,
+      {
+        acceptance: 'Recovery is specific, testable, and stays in the approved boundary.',
+        priority: 'p1'
+      },
       { kind: 'human-controller', id: 'walker' }
     )
     store.transition(card.id, 'begin-discussion', { kind: 'human-controller', id: 'walker' })
@@ -201,7 +222,10 @@ describe('JR IPC', () => {
     const store = await createStore()
     registerJrHandlers(store)
     const card = store.createCard(
-      { title: 'Review validation' },
+      {
+        title: 'Review validation',
+        description: 'Define the recovery path when an invitation is no longer valid.'
+      },
       { kind: 'human-controller', id: 'walker' }
     )
     store.updateCardConfiguration(
@@ -212,6 +236,14 @@ describe('JR IPC', () => {
     store.updateCardExecutionTarget(
       card.id,
       { repositoryId: 'repo-1', baseRef: 'main', setupDecision: 'inherit' },
+      { kind: 'human-controller', id: 'walker' }
+    )
+    store.updateCardDetails(
+      card.id,
+      {
+        acceptance: 'Recovery is specific, testable, and stays in the approved boundary.',
+        priority: 'p1'
+      },
       { kind: 'human-controller', id: 'walker' }
     )
     store.transition(card.id, 'begin-discussion', { kind: 'human-controller', id: 'walker' })

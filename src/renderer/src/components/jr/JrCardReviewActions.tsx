@@ -40,7 +40,9 @@ export function JrCardReviewActions({
         <p className="text-sm font-medium">
           {card.delivery.method === 'hosted-pr'
             ? `已合并 hosted PR ${card.delivery.prNumber} 到 ${card.delivery.mergedInto}`
-            : `已在基础 worktree 合并到 ${card.delivery.mergedInto}`}
+            : card.delivery.method === 'folder-workspace'
+              ? `文件夹工作区已交付到 ${card.delivery.mergedInto}`
+              : `已在基础 worktree 合并到 ${card.delivery.mergedInto}`}
         </p>
       ) : null}
       <div className="flex flex-wrap gap-2">

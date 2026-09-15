@@ -11,6 +11,11 @@ describe('pickRemoteCliEnv', () => {
         ORCA_AGENT_LAUNCH_TOKEN: 'launch-secret',
         ORCA_WORKSPACE_ID: 'workspace-1',
         ORCA_USER_DATA_PATH: '/tmp/orca',
+        JR_CARD_ID: 'card-1',
+        JR_DB_PATH: '/tmp/jr.sqlite',
+        JR_ACTOR_ID: 'codex:card-1',
+        JR_ACTOR_KIND: 'task-agent',
+        JR_WORKTREE_PATH: '/tmp/worktree',
         PATH: '/usr/bin',
         SECRET_TOKEN: 'nope'
       })
@@ -21,6 +26,11 @@ describe('pickRemoteCliEnv', () => {
       ORCA_AGENT_LAUNCH_TOKEN: 'launch-secret',
       ORCA_WORKSPACE_ID: 'workspace-1',
       ORCA_USER_DATA_PATH: '/tmp/orca',
+      JR_CARD_ID: 'card-1',
+      JR_DB_PATH: '/tmp/jr.sqlite',
+      JR_ACTOR_ID: 'codex:card-1',
+      JR_ACTOR_KIND: 'task-agent',
+      JR_WORKTREE_PATH: '/tmp/worktree',
       PATH: '/usr/bin'
     })
   })

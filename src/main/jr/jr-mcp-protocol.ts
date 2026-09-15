@@ -10,7 +10,10 @@ export type JrMcpRequest = {
   params?: unknown
 }
 
-export function handleJrMcpMessage(host: JrTrellisToolHost, raw: unknown): unknown | null {
+export async function handleJrMcpMessage(
+  host: JrTrellisToolHost,
+  raw: unknown
+): Promise<unknown | null> {
   if (!isRecord(raw) || raw.jsonrpc !== '2.0' || typeof raw.method !== 'string') {
     return jsonRpcError(null, -32600, 'Invalid JSON-RPC request.')
   }
@@ -20,7 +23,7 @@ export function handleJrMcpMessage(host: JrTrellisToolHost, raw: unknown): unkno
     return null
   }
   try {
-    return { jsonrpc: '2.0', id, result: dispatch(host, method, raw.params) }
+    return { jsonrpc: '2.0', id, result: await dispatch(host, method, raw.params) }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'JR MCP call failed.'
     if (method === 'tools/call') {
@@ -37,7 +40,11 @@ export function handleJrMcpMessage(host: JrTrellisToolHost, raw: unknown): unkno
   }
 }
 
-function dispatch(host: JrTrellisToolHost, method: string, params: unknown): unknown {
+async function dispatch(
+  host: JrTrellisToolHost,
+  method: string,
+  params: unknown
+): Promise<unknown> {
   if (method === 'initialize') {
     const protocolVersion =
       isRecord(params) && typeof params.protocolVersion === 'string'
@@ -61,7 +68,7 @@ function dispatch(host: JrTrellisToolHost, method: string, params: unknown): unk
   throw new Error(`Unsupported MCP method: ${method}`)
 }
 
-function callTool(host: JrTrellisToolHost, params: unknown): unknown {
+async function callTool(host: JrTrellisToolHost, params: unknown): Promise<unknown> {
   if (!isRecord(params) || typeof params.name !== 'string') {
     throw new Error('MCP tools/call requires a tool name.')
   }
@@ -70,7 +77,7 @@ function callTool(host: JrTrellisToolHost, params: unknown): unknown {
   if (!isRecord(args)) {
     throw new Error('MCP tool arguments must be an object.')
   }
-  const payload = host.call(params.name, args)
+  const payload = await host.call(params.name, args)
   return {
     content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }]
   }

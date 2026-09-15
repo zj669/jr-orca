@@ -69,6 +69,14 @@ describe('JrStore', () => {
       expect.arrayContaining(['workflow.md', 'spec/jr-controller.md', `tasks/${card.id}/prd.md`])
     )
 
+    store.updateCardDetails(
+      card.id,
+      {
+        acceptance: 'Recovery is specific, testable, and stays in the approved boundary.',
+        priority: 'p1'
+      },
+      controller
+    )
     const awaitingApproval = store.transition(card.id, 'request-execution-approval', controller)
     expect(awaitingApproval.status).toBe('pending_execution_approval')
     expect(awaitingApproval.events[0]).toMatchObject({
@@ -129,15 +137,7 @@ describe('JrStore', () => {
 
   it('persists the approved execution handoff and blocks only after Orca reports a failure', async () => {
     const store = await createStore()
-    const card = store.createCard({ title: 'Create a real worktree' }, controller)
-    store.updateCardConfiguration(card.id, { harness: 'cursorcli', modelId: 'auto' }, controller)
-    store.updateCardExecutionTarget(
-      card.id,
-      { repositoryId: 'repo-orca', baseRef: 'main', setupDecision: 'skip' },
-      controller
-    )
-    store.transition(card.id, 'begin-discussion', controller)
-    store.transition(card.id, 'begin-planning', controller)
+    const card = await reachPlanning(store, 'Create a real worktree')
     store.transition(card.id, 'request-execution-approval', controller)
 
     const launch = store.prepareExecution(card.id, controller)
@@ -193,6 +193,11 @@ describe('JrStore', () => {
 
     const blocked = store.recordAgentStatus(card.id, 'blocked', controller)
     expect(blocked.status).toBe('blocked')
+    expect(blocked.blocked).toEqual({
+      owner: 'human-controller:test-walker',
+      reason: 'Agent lifecycle 报告 blocked。',
+      fromStatus: 'executing'
+    })
     expect(blocked.events[0]).toMatchObject({
       kind: 'Harness 报告受阻',
       actor: 'human-controller:test-walker'
@@ -261,27 +266,99 @@ describe('JrStore', () => {
 
   it('requires a persisted execution target before controller approval', async () => {
     const store = await createStore()
-    const card = store.createCard({ title: 'Missing execution target' }, controller)
+    const card = store.createCard(
+      {
+        title: 'Missing execution target',
+        description: 'Define the recovery path when an invitation is no longer valid.'
+      },
+      controller
+    )
     store.updateCardConfiguration(card.id, { harness: 'claude', modelId: 'sonnet' }, controller)
+    store.updateCardDetails(
+      card.id,
+      {
+        acceptance: 'Recovery is specific, testable, and stays in the approved boundary.',
+        priority: 'p1'
+      },
+      controller
+    )
     store.transition(card.id, 'begin-discussion', controller)
     store.transition(card.id, 'begin-planning', controller)
 
     expect(() => store.transition(card.id, 'request-execution-approval', controller)).toThrow(
-      '请先为卡片设置 仓库。'
+      '请先为卡片设置仓库或文件夹工作区。'
     )
+  })
+
+  it('invalidates planning artifacts when harness or model changes', async () => {
+    const store = await createStore()
+    const card = await reachPlanning(store, 'Invalidate after model change')
+    const before = store.readCard(card.id).artifacts.find((item) => item.path === 'workflow.md')
+    store.updateCardConfiguration(card.id, { harness: 'claude', modelId: 'sonnet' }, controller)
+    const after = store.readCard(card.id)
+    expect(after.events.some((event) => event.kind === '计划已作废')).toBe(true)
+    expect(after.artifacts.find((item) => item.path === 'workflow.md')?.version).toBeGreaterThan(
+      before?.version ?? 0
+    )
+  })
+
+  it('rejects execution approval back to planning and freezes the contract after approval', async () => {
+    const store = await createStore()
+    const card = await reachPlanning(store, 'Reject execution')
+    store.updateCardDetails(
+      card.id,
+      {
+        acceptance: 'Recovery is specific, testable, and stays in the approved boundary.',
+        priority: 'p1'
+      },
+      controller
+    )
+    store.transition(card.id, 'request-execution-approval', controller)
+    expect(() => store.updateCardDetails(card.id, { priority: 'p0' }, controller)).toThrow(
+      '执行批准后不能修改问题、验收标准或优先级。'
+    )
+    const planning = store.rejectExecutionApproval(card.id, controller)
+    expect(planning.status).toBe('planning')
+  })
+
+  it('resumes a blocked card to its prior resumable status', async () => {
+    const store = await createStore()
+    const card = await reachExecuting(store, 'Resume blocked')
+    store.recordAgentStatus(card.id, 'blocked', controller)
+    const resumed = store.resumeBlocked(card.id, controller)
+    expect(resumed.status).toBe('executing')
+    expect(resumed.blocked).toBeNull()
   })
 })
 
-async function reachExecuting(store: JrStore, title: string) {
-  const card = store.createCard({ title }, controller)
+async function reachPlanning(store: JrStore, title: string) {
+  const card = store.createCard(
+    {
+      title,
+      description: 'Define the recovery path when an invitation is no longer valid.'
+    },
+    controller
+  )
   store.updateCardConfiguration(card.id, { harness: 'cursorcli', modelId: 'auto' }, controller)
   store.updateCardExecutionTarget(
     card.id,
     { repositoryId: 'repo-orca', baseRef: 'main', setupDecision: 'skip' },
     controller
   )
+  store.updateCardDetails(
+    card.id,
+    {
+      acceptance: 'Recovery is specific, testable, and stays in the approved boundary.',
+      priority: 'p1'
+    },
+    controller
+  )
   store.transition(card.id, 'begin-discussion', controller)
-  store.transition(card.id, 'begin-planning', controller)
+  return store.transition(card.id, 'begin-planning', controller)
+}
+
+async function reachExecuting(store: JrStore, title: string) {
+  const card = await reachPlanning(store, title)
   store.transition(card.id, 'request-execution-approval', controller)
   store.prepareExecution(card.id, controller)
   store.recordWorktreeCreated(

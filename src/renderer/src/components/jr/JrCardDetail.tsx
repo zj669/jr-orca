@@ -1,21 +1,16 @@
 import React from 'react'
-import { ArrowRight, Bot, Loader2, Sparkles } from 'lucide-react'
+import { ArrowRight, Bot, Loader2, RotateCcw, Sparkles, Undo2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select'
 import { JrCardReviewActions } from '@/components/jr/JrCardReviewActions'
+import { JrCardSetupFields } from '@/components/jr/JrCardSetupFields'
 import { launchJrCardExecution } from '@/lib/jr-card-execution-launch'
+import { launchJrPlanningSession } from '@/lib/jr-card-planning-launch'
+import { jrExecutionContractIssues } from '../../../../shared/jr/jr-card-contract'
 import type { Repo } from '../../../../shared/repo-types'
 import type {
   JrBoardSnapshot,
   JrCard,
+  JrCardPriority,
   JrCardTransition,
   JrControllerActor
 } from '../../../../shared/jr/jr-types'
@@ -27,10 +22,6 @@ type JrCardDetailProps = {
   saving: boolean
   controller: JrControllerActor
   runAction: (action: () => Promise<unknown>) => void
-}
-
-function targetIsConfigurable(card: JrCard): boolean {
-  return card.status === 'idea' || card.status === 'discussion' || card.status === 'planning'
 }
 
 function cardAction(card: JrCard): { label: string; transition: JrCardTransition } | null {
@@ -54,10 +45,8 @@ export function JrCardDetail({
   controller,
   runAction
 }: JrCardDetailProps): React.JSX.Element {
-  const selectedHarness = harnesses.find((harness) => harness.id === card.harness) ?? null
-  const selectedRepository =
-    repositories.find((repository) => repository.id === card.execution.repositoryId) ?? null
   const action = cardAction(card)
+  const contractIssues = jrExecutionContractIssues(card)
   const updateTarget = (input: {
     repositoryId: string
     baseRef: string
@@ -127,9 +116,37 @@ export function JrCardDetail({
       setupDecision
     })
   }
+  const handleDetailsBlur = (field: 'description' | 'acceptance', value: string): void => {
+    const next = value.trim()
+    if (next === card[field]) {
+      return
+    }
+    runAction(() => window.api.jr.updateCardDetails(card.id, { [field]: next }, controller))
+  }
+  const handlePriorityChange = (priority: JrCardPriority): void => {
+    if (priority === card.priority) {
+      return
+    }
+    runAction(() => window.api.jr.updateCardDetails(card.id, { priority }, controller))
+  }
+  const handleLifecycle = (transition: JrCardTransition): void => {
+    runAction(async () => {
+      const next = await window.api.jr.transitionCard(card.id, transition, controller)
+      if (transition === 'begin-discussion' || transition === 'begin-planning') {
+        await launchJrPlanningSession(
+          next,
+          transition === 'begin-discussion' ? 'discussion' : 'planning',
+          controller
+        )
+      }
+    })
+  }
 
   return (
-    <section className="mt-4 rounded-xl border bg-card p-4 text-card-foreground">
+    <section
+      className="rounded-xl border bg-card p-4 pb-6 text-card-foreground"
+      data-jr-card-detail=""
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
@@ -143,151 +160,95 @@ export function JrCardDetail({
         </span>
       </div>
 
-      <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2">
-        <div className="space-y-1">
-          <Label htmlFor="jr-harness" className="text-xs">
-            Harness
-          </Label>
-          <Select
-            value={card.harness ?? undefined}
-            onValueChange={handleHarnessChange}
-            disabled={saving || !targetIsConfigurable(card)}
-          >
-            <SelectTrigger id="jr-harness" className="w-full">
-              <SelectValue placeholder="选择 Phase 1 harness" />
-            </SelectTrigger>
-            <SelectContent>
-              {harnesses.map((harness) => (
-                <SelectItem key={harness.id} value={harness.id}>
-                  {harness.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="jr-model" className="text-xs">
-            Model
-          </Label>
-          <Select
-            value={card.model?.id ?? undefined}
-            onValueChange={handleModelChange}
-            disabled={!selectedHarness || saving || !targetIsConfigurable(card)}
-          >
-            <SelectTrigger id="jr-model" className="w-full">
-              <SelectValue placeholder="先选择 harness" />
-            </SelectTrigger>
-            <SelectContent>
-              {selectedHarness?.models.map((model) => (
-                <SelectItem key={model.id} value={model.id}>
-                  {model.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            Phase 1 使用该 harness 在 Orca 中配置的默认模型。
+      {card.blocked ? (
+        <div className="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+          <p className="font-medium text-destructive">受阻</p>
+          <p className="mt-1 text-muted-foreground">
+            负责人 {card.blocked.owner} · 先前状态 {card.blocked.fromStatus}
           </p>
+          <p className="mt-1 whitespace-pre-wrap">{card.blocked.reason}</p>
         </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-3">
-        <div className="space-y-1">
-          <Label htmlFor="jr-repository">Repository</Label>
-          <Select
-            value={card.execution.repositoryId ?? undefined}
-            onValueChange={handleRepositoryChange}
-            disabled={saving || !targetIsConfigurable(card)}
-          >
-            <SelectTrigger id="jr-repository" className="w-full">
-              <SelectValue placeholder="选择 Orca 仓库" />
-            </SelectTrigger>
-            <SelectContent>
-              {repositories.map((repository) => (
-                <SelectItem key={repository.id} value={repository.id}>
-                  {repository.displayName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="jr-base-ref">Base ref</Label>
-          <Input
-            key={`${card.id}:${card.execution.baseRef ?? ''}`}
-            id="jr-base-ref"
-            defaultValue={card.execution.baseRef ?? ''}
-            placeholder="main"
-            disabled={saving || !targetIsConfigurable(card) || !card.execution.repositoryId}
-            onBlur={handleBaseRefBlur}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="jr-setup-policy">Setup policy</Label>
-          <Select
-            value={card.execution.setupDecision}
-            onValueChange={handleSetupPolicyChange}
-            disabled={saving || !targetIsConfigurable(card) || !card.execution.repositoryId}
-          >
-            <SelectTrigger id="jr-setup-policy" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="inherit">Inherit repository policy</SelectItem>
-              <SelectItem value="run">Run setup now</SelectItem>
-              <SelectItem value="skip">Skip setup</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      {repositories.length === 0 ? (
-        <p className="mt-2 text-xs text-muted-foreground">
-          先在 Orca 添加 Git repository，才能批准执行。
-        </p>
-      ) : selectedRepository ? (
-        <p className="mt-2 text-xs text-muted-foreground">
-          {selectedRepository.path} · {card.execution.baseRef ?? '未设置基础分支'}
-        </p>
       ) : null}
 
+      <JrCardSetupFields
+        card={card}
+        harnesses={harnesses}
+        repositories={repositories}
+        saving={saving}
+        onHarnessChange={handleHarnessChange}
+        onModelChange={handleModelChange}
+        onRepositoryChange={handleRepositoryChange}
+        onBaseRefBlur={handleBaseRefBlur}
+        onSetupPolicyChange={handleSetupPolicyChange}
+        onDetailsBlur={handleDetailsBlur}
+        onPriorityChange={handlePriorityChange}
+      />
+
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Bot className="size-3.5" />
-          {card.harness && card.model
-            ? `${card.harness} · ${card.model.label}`
-            : '选择配置后才能创建讨论上下文'}
+        <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+          <Bot className="size-3.5 shrink-0" />
+          <span className="min-w-0 break-keep">
+            {card.harness && card.model
+              ? `${card.harness} · ${card.model.label}`
+              : '选择配置后才能创建讨论上下文'}
+          </span>
         </div>
         {action ? (
           <Button
             type="button"
             size="sm"
-            onClick={() =>
-              runAction(() => window.api.jr.transitionCard(card.id, action.transition, controller))
-            }
+            onClick={() => handleLifecycle(action.transition)}
             disabled={
               saving ||
-              (card.status === 'idea' && !card.model) ||
-              (card.status === 'planning' &&
-                (!card.execution.repositoryId || !card.execution.baseRef))
+              (card.status === 'idea' && (!card.model || !card.execution.repositoryId)) ||
+              (card.status === 'discussion' && !card.execution.repositoryId) ||
+              (card.status === 'planning' && contractIssues.length > 0)
             }
           >
             {card.status === 'planning' ? <Sparkles /> : <ArrowRight />}
             {action.label}
           </Button>
         ) : card.status === 'pending_execution_approval' ? (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                runAction(() => window.api.jr.rejectExecutionApproval(card.id, controller))
+              }
+              disabled={saving}
+            >
+              <Undo2 />
+              退回规划
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => runAction(() => launchJrCardExecution(card.id, controller))}
+              disabled={saving}
+            >
+              {saving ? <Loader2 className="animate-spin" /> : <Sparkles />}
+              批准并启动执行
+            </Button>
+          </div>
+        ) : card.status === 'blocked' ? (
           <Button
             type="button"
             size="sm"
-            onClick={() => runAction(() => launchJrCardExecution(card.id, controller))}
+            onClick={() => runAction(() => window.api.jr.resumeBlocked(card.id, controller))}
             disabled={saving}
           >
-            {saving ? <Loader2 className="animate-spin" /> : <Sparkles />}
-            批准并启动执行
+            <RotateCcw />
+            恢复到先前状态
           </Button>
         ) : (
           <p className="text-sm font-medium">{statusMessage(card.status)}</p>
         )}
       </div>
+      {card.status === 'planning' && contractIssues.length > 0 ? (
+        <p className="mt-2 text-xs text-muted-foreground">{contractIssues[0]}</p>
+      ) : null}
 
       <JrCardReviewActions
         card={card}
@@ -308,7 +269,7 @@ export function JrCardDetail({
                   {artifact.path}
                   {artifact.version > 1 ? ` · v${artifact.version}` : ''}
                 </p>
-                <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-xs text-muted-foreground">
+                <p className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap text-xs text-muted-foreground scrollbar-sleek">
                   {artifact.content}
                 </p>
               </div>
@@ -342,6 +303,9 @@ function statusMessage(status: JrCard['status']): string {
   }
   if (status === 'merged') {
     return '已合并。'
+  }
+  if (status === 'cancelled') {
+    return '卡片已取消。'
   }
   return '该卡片当前没有可用的 controller 操作。'
 }
