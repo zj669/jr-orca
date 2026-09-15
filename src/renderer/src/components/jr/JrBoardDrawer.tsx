@@ -27,6 +27,14 @@ const LANES: readonly { status: JrCard['status']; label: string; description: st
   },
   { status: 'creating_worktree', label: '创建工作树', description: 'Orca Create' },
   { status: 'executing', label: '执行中', description: 'Orca Work' },
+  { status: 'verifying', label: '验证中', description: 'Orca Review' },
+  {
+    status: 'pending_merge_approval',
+    label: '待批准合并',
+    description: '等待 controller'
+  },
+  { status: 'shipping', label: '交付中', description: 'Orca Ship' },
+  { status: 'merged', label: '已合并', description: 'Trellis Finish' },
   { status: 'blocked', label: '受阻', description: '需要 controller 处理' }
 ]
 
@@ -131,7 +139,7 @@ export default function JrBoardDrawer({
             JR Delivery Board
           </SheetTitle>
           <SheetDescription>
-            Trellis 规划数据保存在本地 JR 数据库；只有 controller 能提交执行审批。
+            Trellis 数据保存在本地 JR 数据库；只有 controller 能批准执行和合并。
           </SheetDescription>
         </SheetHeader>
 
@@ -174,8 +182,8 @@ export default function JrBoardDrawer({
             ) : null}
 
             {snapshot ? (
-              <div className="min-w-[1280px] p-4">
-                <div className="grid grid-cols-7 gap-3">
+              <div className="min-w-[1980px] p-4">
+                <div className="grid grid-cols-11 gap-3">
                   {LANES.map((lane) => {
                     const cards = snapshot.cards.filter((card) => card.status === lane.status)
                     return (

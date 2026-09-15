@@ -5,9 +5,13 @@ import type {
   JrCardTransition,
   JrControllerActor,
   JrCreateCardInput,
+  JrDeliveryRecord,
   JrExecutionLaunchRequest,
+  JrMergeIntoBaseInput,
   JrRecordAgentSessionInput,
   JrRecordWorktreeInput,
+  JrReviewSnapshot,
+  JrShipRequest,
   JrUpdateCardInput,
   JrUpdateExecutionTargetInput
 } from '../../shared/jr/jr-types'
@@ -53,4 +57,18 @@ export type JrApi = {
   ) => Promise<JrCard>
   recordAgentExit: (cardId: string, code: number, actor: JrControllerActor) => Promise<JrCard>
   blockExecution: (cardId: string, reason: string, actor: JrControllerActor) => Promise<JrCard>
+  requestReview: (
+    cardId: string,
+    snapshot: JrReviewSnapshot,
+    actor: JrControllerActor
+  ) => Promise<JrCard>
+  passVerification: (cardId: string, actor: JrControllerActor) => Promise<JrCard>
+  returnToExecution: (cardId: string, actor: JrControllerActor) => Promise<JrCard>
+  prepareShip: (cardId: string, actor: JrControllerActor) => Promise<JrShipRequest>
+  recordMerged: (
+    cardId: string,
+    delivery: JrDeliveryRecord,
+    actor: JrControllerActor
+  ) => Promise<JrCard>
+  mergeIntoBase: (input: JrMergeIntoBaseInput) => Promise<void>
 }

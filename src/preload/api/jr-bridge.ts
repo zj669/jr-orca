@@ -22,5 +22,13 @@ export const jrApi = {
   recordAgentExit: (cardId, code, actor) =>
     ipcRenderer.invoke('jr:recordAgentExit', cardId, code, actor),
   blockExecution: (cardId, reason, actor) =>
-    ipcRenderer.invoke('jr:blockExecution', cardId, reason, actor)
+    ipcRenderer.invoke('jr:blockExecution', cardId, reason, actor),
+  requestReview: (cardId, snapshot, actor) =>
+    ipcRenderer.invoke('jr:requestReview', cardId, snapshot, actor),
+  passVerification: (cardId, actor) => ipcRenderer.invoke('jr:passVerification', cardId, actor),
+  returnToExecution: (cardId, actor) => ipcRenderer.invoke('jr:returnToExecution', cardId, actor),
+  prepareShip: (cardId, actor) => ipcRenderer.invoke('jr:prepareShip', cardId, actor),
+  recordMerged: (cardId, delivery, actor) =>
+    ipcRenderer.invoke('jr:recordMerged', cardId, delivery, actor),
+  mergeIntoBase: (input) => ipcRenderer.invoke('jr:mergeIntoBase', input)
 } satisfies PreloadApi['jr']

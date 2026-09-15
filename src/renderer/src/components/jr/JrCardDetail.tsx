@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
+import { JrCardReviewActions } from '@/components/jr/JrCardReviewActions'
 import { launchJrCardExecution } from '@/lib/jr-card-execution-launch'
 import type { Repo } from '../../../../shared/repo-types'
 import type {
@@ -288,6 +289,13 @@ export function JrCardDetail({
         )}
       </div>
 
+      <JrCardReviewActions
+        card={card}
+        saving={saving}
+        controller={controller}
+        runAction={runAction}
+      />
+
       {card.artifacts.length > 0 ? (
         <details className="mt-4 border-t pt-4">
           <summary className="cursor-pointer text-sm font-medium">
@@ -318,7 +326,19 @@ function statusMessage(status: JrCard['status']): string {
     return 'Orca 正在创建 worktree。'
   }
   if (status === 'executing') {
-    return '已通过 Orca agent launcher 启动 harness。'
+    return 'Harness 已启动。完成后请求验证。'
+  }
+  if (status === 'verifying') {
+    return '正在使用 Orca Review 核对 diff。'
+  }
+  if (status === 'pending_merge_approval') {
+    return '等待 controller 批准合并。'
+  }
+  if (status === 'shipping') {
+    return '正在通过 Orca 推送并合并。'
+  }
+  if (status === 'merged') {
+    return '已合并。'
   }
   return '该卡片当前没有可用的 controller 操作。'
 }

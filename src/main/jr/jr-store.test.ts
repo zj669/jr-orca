@@ -197,6 +197,83 @@ describe('JrStore', () => {
     })
   })
 
+  it('captures an Orca review snapshot and only ships after controller merge approval', async () => {
+    const store = await createStore()
+    const card = await reachExecuting(store, 'Review the worktree')
+    const snapshot = {
+      worktreeId: card.execution.worktree?.id ?? '',
+      branch: 'jr/worktree',
+      baseRef: 'main',
+      headOid: 'abc',
+      mergeBase: 'def',
+      changedFiles: 3,
+      commitsAhead: 2,
+      commitsBehind: 0,
+      uncommittedFiles: 0,
+      conflicted: false,
+      compareStatus: 'ready' as const,
+      capturedAt: '2026-01-01T00:00:00.000Z'
+    }
+
+    const verifying = store.requestReview(card.id, snapshot, controller)
+    expect(verifying.status).toBe('verifying')
+    expect(verifying.review).toMatchObject({ changedFiles: 3, commitsAhead: 2 })
+    expect(verifying.artifacts.map((artifact) => artifact.path)).toContain(
+      `tasks/${card.id}/review.md`
+    )
+
+    expect(() =>
+      store.passVerification(card.id, { kind: 'human-controller', id: 'walker' })
+    ).not.toThrow()
+    expect(store.listBoard().cards.find((item) => item.id === card.id)?.status).toBe(
+      'pending_merge_approval'
+    )
+
+    const ship = store.prepareShip(card.id, controller)
+    expect(ship).toMatchObject({
+      cardId: card.id,
+      worktree: { branch: 'jr/worktree' },
+      baseRef: 'main'
+    })
+    const merged = store.recordMerged(
+      card.id,
+      { method: 'hosted-pr', prNumber: 18, mergedInto: 'main', headOid: 'abc' },
+      controller
+    )
+    expect(merged.status).toBe('merged')
+    expect(merged.delivery).toMatchObject({ method: 'hosted-pr', prNumber: 18 })
+    expect(merged.artifacts.map((artifact) => artifact.path)).toContain(
+      `tasks/${card.id}/journal.md`
+    )
+  })
+
+  it('rejects verification while the worktree is dirty and can return to execution', async () => {
+    const store = await createStore()
+    const card = await reachExecuting(store, 'Dirty review')
+    store.requestReview(
+      card.id,
+      {
+        worktreeId: card.execution.worktree?.id ?? '',
+        branch: 'jr/worktree',
+        baseRef: 'main',
+        headOid: 'abc',
+        mergeBase: 'def',
+        changedFiles: 1,
+        commitsAhead: 1,
+        commitsBehind: 0,
+        uncommittedFiles: 4,
+        conflicted: false,
+        compareStatus: 'ready',
+        capturedAt: '2026-01-01T00:00:00.000Z'
+      },
+      controller
+    )
+
+    expect(() => store.passVerification(card.id, controller)).toThrow('还有未提交变更')
+    const executing = store.returnToExecution(card.id, controller)
+    expect(executing.status).toBe('executing')
+  })
+
   it('requires a persisted execution target before controller approval', async () => {
     const store = await createStore()
     const card = store.createCard({ title: 'Missing execution target' }, controller)
@@ -209,3 +286,32 @@ describe('JrStore', () => {
     )
   })
 })
+
+async function reachExecuting(store: JrStore, title: string) {
+  const card = store.createCard({ title }, controller)
+  store.updateCardConfiguration(card.id, { harness: 'cursorcli', modelId: 'auto' }, controller)
+  store.updateCardExecutionTarget(
+    card.id,
+    { repositoryId: 'repo-orca', baseRef: 'main', setupDecision: 'skip' },
+    controller
+  )
+  store.transition(card.id, 'begin-discussion', controller)
+  store.transition(card.id, 'begin-planning', controller)
+  store.transition(card.id, 'request-execution-approval', controller)
+  store.prepareExecution(card.id, controller)
+  store.recordWorktreeCreated(
+    card.id,
+    { id: 'repo-orca::/tmp/jr-worktree', path: '/tmp/jr-worktree', branch: 'jr/worktree' },
+    controller
+  )
+  return store.recordAgentStarted(
+    card.id,
+    {
+      agent: 'cursor',
+      tabId: 'tab-jr',
+      paneKey: 'tab-jr:pane-jr',
+      ptyId: 'pty-jr'
+    },
+    controller
+  )
+}

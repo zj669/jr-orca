@@ -1,8 +1,7 @@
 import { app } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { mkdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import SyncDatabase from '../sqlite/sync-database'
+import { join } from 'node:path'
+import type SyncDatabase from '../sqlite/sync-database'
 import {
   isJrHarness,
   JR_HARNESS_CATALOG,
@@ -13,7 +12,10 @@ import {
   type JrCreateCardInput,
   type JrExecutionLaunchRequest,
   type JrRecordAgentSessionInput,
+  type JrDeliveryRecord,
   type JrRecordWorktreeInput,
+  type JrReviewSnapshot,
+  type JrShipRequest,
   type JrUpdateCardInput,
   type JrUpdateExecutionTargetInput,
   type JrAgentLifecycleState
@@ -26,6 +28,7 @@ import {
 import { buildJrPlanningArtifacts, jrTaskArtifactPath } from './jr-trellis-artifact-templates'
 import {
   getJrCard,
+  JR_CARD_SELECT_COLUMNS,
   jrNow,
   readJrCard,
   recordJrEvent,
@@ -34,72 +37,27 @@ import {
 } from './jr-card-records'
 import { requireJrDatabaseRow } from './jr-database-records'
 import { JrExecutionStore } from './jr-execution-store'
+import { JrReviewStore } from './jr-review-store'
+import { openJrSqlite } from './jr-store-schema'
 
 const CONFIGURABLE_STATUSES = new Set<JrCard['status']>(['idea', 'discussion', 'planning'])
 
 export class JrStore {
   private readonly db: SyncDatabase
   private readonly execution: JrExecutionStore
+  private readonly review: JrReviewStore
 
   constructor(databasePath: string) {
-    mkdirSync(dirname(databasePath), { recursive: true })
-    this.db = new SyncDatabase(databasePath)
-    this.db.exec(`
-      PRAGMA journal_mode = WAL;
-      PRAGMA foreign_keys = ON;
-
-      CREATE TABLE IF NOT EXISTS jr_cards (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        description TEXT NOT NULL,
-        status TEXT NOT NULL,
-        harness TEXT,
-        model_id TEXT,
-        model_label TEXT,
-        repository_id TEXT,
-        base_ref TEXT,
-        setup_decision TEXT NOT NULL DEFAULT 'inherit',
-        worktree_id TEXT,
-        worktree_path TEXT,
-        worktree_branch TEXT,
-        worktree_phase TEXT,
-        agent_type TEXT,
-        agent_tab_id TEXT,
-        agent_pane_key TEXT,
-        agent_pty_id TEXT,
-        agent_status TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS jr_artifacts (
-        id TEXT PRIMARY KEY,
-        card_id TEXT NOT NULL REFERENCES jr_cards(id) ON DELETE CASCADE,
-        path TEXT NOT NULL,
-        content TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        UNIQUE(card_id, path)
-      );
-
-      CREATE TABLE IF NOT EXISTS jr_events (
-        id TEXT PRIMARY KEY,
-        card_id TEXT NOT NULL REFERENCES jr_cards(id) ON DELETE CASCADE,
-        kind TEXT NOT NULL,
-        detail TEXT NOT NULL,
-        actor TEXT NOT NULL,
-        created_at TEXT NOT NULL
-      );
-    `)
+    this.db = openJrSqlite(databasePath)
     this.execution = new JrExecutionStore(this.db)
+    this.review = new JrReviewStore(this.db)
     this.ensureDemoCard()
   }
 
   listBoard(): JrBoardSnapshot {
     const rows = this.db
       .prepare(
-        `SELECT id, title, description, status, harness, model_id, model_label, repository_id, base_ref,
-                setup_decision, worktree_id, worktree_path, worktree_branch, worktree_phase, agent_type,
-                agent_tab_id, agent_pane_key, agent_pty_id, agent_status, created_at, updated_at
+        `SELECT ${JR_CARD_SELECT_COLUMNS}
          FROM jr_cards
          ORDER BY updated_at DESC`
       )
@@ -288,7 +246,39 @@ export class JrStore {
 
   blockExecution(cardId: string, reason: string, actor: JrControllerActor): JrCard {
     requireJrController(actor)
-    this.execution.block(this.getCard(cardId), reason, actor)
+    const card = this.getCard(cardId)
+    if (!this.review.block(card, reason, actor)) {
+      this.execution.block(card, reason, actor)
+    }
+    return this.getCard(cardId)
+  }
+
+  requestReview(cardId: string, snapshot: JrReviewSnapshot, actor: JrControllerActor): JrCard {
+    requireJrController(actor)
+    this.review.requestReview(this.getCard(cardId), snapshot, actor)
+    return this.getCard(cardId)
+  }
+
+  passVerification(cardId: string, actor: JrControllerActor): JrCard {
+    requireJrController(actor)
+    this.review.passVerification(this.getCard(cardId), actor)
+    return this.getCard(cardId)
+  }
+
+  returnToExecution(cardId: string, actor: JrControllerActor): JrCard {
+    requireJrController(actor)
+    this.review.returnToExecution(this.getCard(cardId), actor)
+    return this.getCard(cardId)
+  }
+
+  prepareShip(cardId: string, actor: JrControllerActor): JrShipRequest {
+    requireJrController(actor)
+    return this.review.prepareShip(this.getCard(cardId), actor)
+  }
+
+  recordMerged(cardId: string, delivery: JrDeliveryRecord, actor: JrControllerActor): JrCard {
+    requireJrController(actor)
+    this.review.recordMerged(this.getCard(cardId), delivery, actor)
     return this.getCard(cardId)
   }
 

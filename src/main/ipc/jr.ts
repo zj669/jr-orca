@@ -2,9 +2,14 @@ import { ipcMain } from 'electron'
 import {
   type JrAgentLifecycleState,
   isJrCardTransition,
+  isJrDeliveryRecord,
   isJrHarness,
+  isJrReviewSnapshot,
+  type JrDeliveryRecord,
+  type JrMergeIntoBaseInput,
   type JrRecordAgentSessionInput,
   type JrRecordWorktreeInput,
+  type JrReviewSnapshot,
   type JrCardTransition,
   type JrControllerActor,
   type JrCreateCardInput,
@@ -12,6 +17,7 @@ import {
   type JrUpdateExecutionTargetInput
 } from '../../shared/jr/jr-types'
 import { getJrStore, type JrStore } from '../jr/jr-store'
+import { mergeJrBranchIntoBase } from '../jr/jr-local-base-merge'
 
 type JrHandlerStore = Pick<
   JrStore,
@@ -27,6 +33,11 @@ type JrHandlerStore = Pick<
   | 'recordAgentStatus'
   | 'recordAgentExit'
   | 'blockExecution'
+  | 'requestReview'
+  | 'passVerification'
+  | 'returnToExecution'
+  | 'prepareShip'
+  | 'recordMerged'
 >
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -142,6 +153,36 @@ function isJrAgentLifecycleState(value: unknown): value is JrAgentLifecycleState
   return value === 'working' || value === 'blocked' || value === 'waiting' || value === 'done'
 }
 
+function parseReviewSnapshot(value: unknown): JrReviewSnapshot {
+  if (!isJrReviewSnapshot(value)) {
+    throw new Error('JR review snapshot is invalid.')
+  }
+  return value
+}
+
+function parseDeliveryRecord(value: unknown): JrDeliveryRecord {
+  if (!isJrDeliveryRecord(value)) {
+    throw new Error('JR delivery record is invalid.')
+  }
+  return value
+}
+
+function parseMergeIntoBaseInput(value: unknown): JrMergeIntoBaseInput {
+  if (!isRecord(value)) {
+    throw new Error('JR local merge input is required.')
+  }
+  const connectionId = value.connectionId
+  if (connectionId !== undefined && typeof connectionId !== 'string') {
+    throw new Error('JR merge connection id is invalid.')
+  }
+  return {
+    baseWorktreePath: requireString(value.baseWorktreePath, 'base worktree path'),
+    branch: requireString(value.branch, 'feature branch'),
+    expectedBaseRef: requireString(value.expectedBaseRef, 'base ref'),
+    ...(connectionId ? { connectionId } : {})
+  }
+}
+
 export function registerJrHandlers(store: JrHandlerStore = getJrStore()): void {
   ipcMain.handle('jr:listBoard', () => store.listBoard())
   ipcMain.handle('jr:createCard', (_event, rawInput: unknown, rawActor: unknown) =>
@@ -234,5 +275,35 @@ export function registerJrHandlers(store: JrHandlerStore = getJrStore()): void {
         requireString(rawReason, 'execution failure reason'),
         parseActor(rawActor)
       )
+  )
+  ipcMain.handle(
+    'jr:requestReview',
+    (_event, cardId: unknown, rawSnapshot: unknown, rawActor: unknown) =>
+      store.requestReview(
+        requireString(cardId, 'card id'),
+        parseReviewSnapshot(rawSnapshot),
+        parseActor(rawActor)
+      )
+  )
+  ipcMain.handle('jr:passVerification', (_event, cardId: unknown, rawActor: unknown) =>
+    store.passVerification(requireString(cardId, 'card id'), parseActor(rawActor))
+  )
+  ipcMain.handle('jr:returnToExecution', (_event, cardId: unknown, rawActor: unknown) =>
+    store.returnToExecution(requireString(cardId, 'card id'), parseActor(rawActor))
+  )
+  ipcMain.handle('jr:prepareShip', (_event, cardId: unknown, rawActor: unknown) =>
+    store.prepareShip(requireString(cardId, 'card id'), parseActor(rawActor))
+  )
+  ipcMain.handle(
+    'jr:recordMerged',
+    (_event, cardId: unknown, rawDelivery: unknown, rawActor: unknown) =>
+      store.recordMerged(
+        requireString(cardId, 'card id'),
+        parseDeliveryRecord(rawDelivery),
+        parseActor(rawActor)
+      )
+  )
+  ipcMain.handle('jr:mergeIntoBase', (_event, rawInput: unknown) =>
+    mergeJrBranchIntoBase(parseMergeIntoBaseInput(rawInput))
   )
 }

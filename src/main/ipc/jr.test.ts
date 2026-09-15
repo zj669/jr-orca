@@ -60,7 +60,7 @@ describe('JR IPC', () => {
     const store = await createStore()
     registerJrHandlers(store)
 
-    expect(ipcHandleMock).toHaveBeenCalledTimes(12)
+    expect(ipcHandleMock).toHaveBeenCalledTimes(18)
 
     await invoke(
       'jr:createCard',
@@ -191,5 +191,87 @@ describe('JR IPC', () => {
         agentSession: { agent: 'codex', status: 'blocked' }
       }
     })
+  })
+
+  it('keeps merge approval on the controller and validates the review snapshot', async () => {
+    const store = await createStore()
+    registerJrHandlers(store)
+    const card = store.createCard(
+      { title: 'Review validation' },
+      { kind: 'human-controller', id: 'walker' }
+    )
+    store.updateCardConfiguration(
+      card.id,
+      { harness: 'claude', modelId: 'sonnet' },
+      { kind: 'human-controller', id: 'walker' }
+    )
+    store.updateCardExecutionTarget(
+      card.id,
+      { repositoryId: 'repo-1', baseRef: 'main', setupDecision: 'inherit' },
+      { kind: 'human-controller', id: 'walker' }
+    )
+    store.transition(card.id, 'begin-discussion', { kind: 'human-controller', id: 'walker' })
+    store.transition(card.id, 'begin-planning', { kind: 'human-controller', id: 'walker' })
+    store.transition(card.id, 'request-execution-approval', {
+      kind: 'human-controller',
+      id: 'walker'
+    })
+    store.prepareExecution(card.id, { kind: 'human-controller', id: 'walker' })
+    store.recordWorktreeCreated(
+      card.id,
+      { id: 'repo-1::/tmp/jr', path: '/tmp/jr', branch: 'jr/review' },
+      { kind: 'human-controller', id: 'walker' }
+    )
+    store.recordAgentStarted(
+      card.id,
+      { agent: 'claude', tabId: 'tab-1', paneKey: 'tab-1:pane-1', ptyId: 'pty-1' },
+      { kind: 'human-controller', id: 'walker' }
+    )
+
+    expect(() =>
+      invoke(
+        'jr:requestReview',
+        undefined,
+        card.id,
+        { changedFiles: 1 },
+        {
+          kind: 'human-controller',
+          id: 'walker'
+        }
+      )
+    ).toThrow('JR review snapshot is invalid.')
+
+    await invoke(
+      'jr:requestReview',
+      undefined,
+      card.id,
+      {
+        worktreeId: 'repo-1::/tmp/jr',
+        branch: 'jr/review',
+        baseRef: 'main',
+        headOid: 'abc',
+        mergeBase: 'def',
+        changedFiles: 2,
+        commitsAhead: 1,
+        commitsBehind: 0,
+        uncommittedFiles: 0,
+        conflicted: false,
+        compareStatus: 'ready',
+        capturedAt: '2026-01-01T00:00:00.000Z'
+      },
+      { kind: 'human-controller', id: 'walker' }
+    )
+
+    expect(() =>
+      invoke('jr:passVerification', undefined, card.id, { kind: 'task-agent', id: 'worker' })
+    ).toThrow('JR actor must have controller capability.')
+
+    await invoke('jr:passVerification', undefined, card.id, {
+      kind: 'human-controller',
+      id: 'walker'
+    })
+    expect(store.listBoard().cards.find((item) => item.id === card.id)?.status).toBe(
+      'pending_merge_approval'
+    )
   })
 })

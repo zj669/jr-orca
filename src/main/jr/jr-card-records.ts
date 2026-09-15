@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import type SyncDatabase from '../sqlite/sync-database'
 import {
+  isJrDeliveryRecord,
   isJrHarness,
+  isJrReviewSnapshot,
   type JrCard,
   type JrControllerActor,
   type JrModelChoice
@@ -19,15 +21,13 @@ export function jrNow(): string {
   return new Date().toISOString()
 }
 
+export const JR_CARD_SELECT_COLUMNS = `id, title, description, status, harness, model_id, model_label, repository_id, base_ref,
+                setup_decision, worktree_id, worktree_path, worktree_branch, worktree_phase, agent_type,
+                agent_tab_id, agent_pane_key, agent_pty_id, agent_status, review_json, delivery_json,
+                created_at, updated_at`
+
 export function getJrCard(db: SyncDatabase, cardId: string): JrCard {
-  const row = db
-    .prepare(
-      `SELECT id, title, description, status, harness, model_id, model_label, repository_id, base_ref,
-              setup_decision, worktree_id, worktree_path, worktree_branch, worktree_phase, agent_type,
-              agent_tab_id, agent_pane_key, agent_pty_id, agent_status, created_at, updated_at
-       FROM jr_cards WHERE id = ?`
-    )
-    .get(cardId)
+  const row = db.prepare(`SELECT ${JR_CARD_SELECT_COLUMNS} FROM jr_cards WHERE id = ?`).get(cardId)
   if (row === undefined) {
     throw new Error('未找到 JR 卡片。')
   }
@@ -82,6 +82,8 @@ export function readJrCard(db: SyncDatabase, row: JrDatabaseRow): JrCard {
             }
           : null
     },
+    review: readJrJson(optionalJrDatabaseString(row, 'review_json'), isJrReviewSnapshot),
+    delivery: readJrJson(optionalJrDatabaseString(row, 'delivery_json'), isJrDeliveryRecord),
     createdAt: requireJrDatabaseString(row, 'created_at'),
     updatedAt: requireJrDatabaseString(row, 'updated_at'),
     artifacts: listJrCardArtifacts(db, id),
@@ -147,4 +149,16 @@ function isJrAgentLifecycleState(
     value === 'waiting' ||
     value === 'done'
   )
+}
+
+function readJrJson<T>(value: string | null, guard: (parsed: unknown) => parsed is T): T | null {
+  if (!value) {
+    return null
+  }
+  try {
+    const parsed: unknown = JSON.parse(value)
+    return guard(parsed) ? parsed : null
+  } catch {
+    return null
+  }
 }

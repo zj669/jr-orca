@@ -51,6 +51,57 @@ export type JrExecutionState = JrExecutionTarget & {
   agentSession: JrAgentSession | null
 }
 
+export const JR_COMPARE_STATUSES = [
+  'ready',
+  'invalid-base',
+  'unborn-head',
+  'no-merge-base',
+  'loading',
+  'error'
+] as const
+export type JrCompareStatus = (typeof JR_COMPARE_STATUSES)[number]
+
+export type JrReviewSnapshot = {
+  worktreeId: string
+  branch: string
+  baseRef: string
+  headOid: string | null
+  mergeBase: string | null
+  changedFiles: number
+  commitsAhead: number
+  commitsBehind: number
+  uncommittedFiles: number
+  conflicted: boolean
+  compareStatus: JrCompareStatus
+  capturedAt: string
+}
+
+export const JR_DELIVERY_METHODS = ['hosted-pr', 'local-base-merge'] as const
+export type JrDeliveryMethod = (typeof JR_DELIVERY_METHODS)[number]
+
+export type JrDeliveryRecord = {
+  method: JrDeliveryMethod
+  prNumber: number | null
+  mergedInto: string
+  headOid: string | null
+}
+
+export type JrShipRequest = {
+  cardId: string
+  title: string
+  worktree: JrWorktreeReference
+  repositoryId: string
+  baseRef: string
+  review: JrReviewSnapshot
+}
+
+export type JrMergeIntoBaseInput = {
+  baseWorktreePath: string
+  branch: string
+  expectedBaseRef: string
+  connectionId?: string
+}
+
 export type JrCard = {
   id: string
   title: string
@@ -59,6 +110,8 @@ export type JrCard = {
   harness: JrHarness | null
   model: JrModelChoice | null
   execution: JrExecutionState
+  review: JrReviewSnapshot | null
+  delivery: JrDeliveryRecord | null
   createdAt: string
   updatedAt: string
   artifacts: JrArtifact[]
@@ -167,6 +220,50 @@ export function isJrHarness(value: unknown): value is JrHarness {
 
 export function isJrCardTransition(value: unknown): value is JrCardTransition {
   return typeof value === 'string' && JR_CARD_TRANSITIONS.some((transition) => transition === value)
+}
+
+export function isJrCompareStatus(value: unknown): value is JrCompareStatus {
+  return typeof value === 'string' && JR_COMPARE_STATUSES.some((status) => status === value)
+}
+
+export function isJrDeliveryMethod(value: unknown): value is JrDeliveryMethod {
+  return typeof value === 'string' && JR_DELIVERY_METHODS.some((method) => method === value)
+}
+
+export function isJrReviewSnapshot(value: unknown): value is JrReviewSnapshot {
+  if (!isJrRecord(value)) {
+    return false
+  }
+  return (
+    typeof value.worktreeId === 'string' &&
+    typeof value.branch === 'string' &&
+    typeof value.baseRef === 'string' &&
+    (value.headOid === null || typeof value.headOid === 'string') &&
+    (value.mergeBase === null || typeof value.mergeBase === 'string') &&
+    typeof value.changedFiles === 'number' &&
+    typeof value.commitsAhead === 'number' &&
+    typeof value.commitsBehind === 'number' &&
+    typeof value.uncommittedFiles === 'number' &&
+    typeof value.conflicted === 'boolean' &&
+    isJrCompareStatus(value.compareStatus) &&
+    typeof value.capturedAt === 'string'
+  )
+}
+
+export function isJrDeliveryRecord(value: unknown): value is JrDeliveryRecord {
+  if (!isJrRecord(value)) {
+    return false
+  }
+  return (
+    isJrDeliveryMethod(value.method) &&
+    (value.prNumber === null || typeof value.prNumber === 'number') &&
+    typeof value.mergedInto === 'string' &&
+    (value.headOid === null || typeof value.headOid === 'string')
+  )
+}
+
+function isJrRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object'
 }
 
 function jrHarnessModels(agent: 'cursor' | 'claude' | 'codex' | 'gemini'): JrModelChoice[] {
