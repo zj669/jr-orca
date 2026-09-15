@@ -1,11 +1,15 @@
 import type { JrArtifact, JrEvent } from '../../shared/jr/jr-types'
 import type SyncDatabase from '../sqlite/sync-database'
-import { requireJrDatabaseRow, requireJrDatabaseString } from './jr-database-records'
+import {
+  requireJrDatabaseInteger,
+  requireJrDatabaseRow,
+  requireJrDatabaseString
+} from './jr-database-records'
 
 export function listJrCardArtifacts(db: SyncDatabase, cardId: string): JrArtifact[] {
   const rows = db
     .prepare(
-      `SELECT id, card_id, path, content, updated_at FROM jr_artifacts
+      `SELECT id, card_id, path, content, version, updated_at FROM jr_artifacts
        WHERE card_id = ? ORDER BY path`
     )
     .all(cardId)
@@ -16,6 +20,7 @@ export function listJrCardArtifacts(db: SyncDatabase, cardId: string): JrArtifac
       cardId: requireJrDatabaseString(row, 'card_id'),
       path: requireJrDatabaseString(row, 'path'),
       content: requireJrDatabaseString(row, 'content'),
+      version: requireJrDatabaseInteger(row, 'version'),
       updatedAt: requireJrDatabaseString(row, 'updated_at')
     }
   })

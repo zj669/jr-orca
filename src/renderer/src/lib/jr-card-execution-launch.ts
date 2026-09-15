@@ -49,6 +49,7 @@ type JrExecutionLaunchDependencies = {
     worktree: JrRecordWorktreeInput,
     actor: JrControllerActor
   ) => Promise<unknown>
+  seedTrellisSession: (cardId: string, worktreePath: string) => Promise<unknown>
   recordAgentStarted: (
     cardId: string,
     session: JrRecordAgentSessionInput,
@@ -91,6 +92,7 @@ export function createJrCardExecutionLauncher(dependencies: JrExecutionLaunchDep
           creationId
         })
         await dependencies.recordWorktreeCreated(request.cardId, worktree, actor)
+        await dependencies.seedTrellisSession(request.cardId, worktree.path)
         const agent = jrHarnessAgent(request.harness)
         const session = await dependencies.launchAgent({
           agent,
@@ -198,6 +200,7 @@ export async function launchJrCardExecution(
       window.api.jr.recordWorktreeProgress(id, phase, controller),
     recordWorktreeCreated: (id, worktree, controller) =>
       window.api.jr.recordWorktreeCreated(id, worktree, controller),
+    seedTrellisSession: (id, worktreePath) => window.api.jr.seedTrellisSession(id, worktreePath),
     recordAgentStarted: (id, session, controller) =>
       window.api.jr.recordAgentStarted(id, session, controller),
     recordAgentStatus: (id, status, controller) =>

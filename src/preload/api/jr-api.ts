@@ -40,6 +40,7 @@ export type JrApi = {
     input: JrRecordWorktreeInput,
     actor: JrControllerActor
   ) => Promise<JrCard>
+  seedTrellisSession: (cardId: string, worktreePath: string) => Promise<string[]>
   recordWorktreeProgress: (
     cardId: string,
     phase: 'fetching' | 'creating',

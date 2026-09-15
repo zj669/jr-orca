@@ -1,10 +1,9 @@
-import { app } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { join } from 'node:path'
 import type SyncDatabase from '../sqlite/sync-database'
 import {
   isJrHarness,
   JR_HARNESS_CATALOG,
+  type JrActor,
   type JrBoardSnapshot,
   type JrCard,
   type JrCardTransition,
@@ -21,6 +20,7 @@ import {
   type JrAgentLifecycleState
 } from '../../shared/jr/jr-types'
 import {
+  requireJrActor,
   requireJrAiConfiguration,
   requireJrCardState,
   requireJrController
@@ -97,10 +97,11 @@ export class JrStore {
       this.db,
       id,
       jrTaskArtifactPath(id, 'idea.md'),
-      `# ${title}\n\n${description}\n`
+      `# ${title}\n\n${description}\n`,
+      actor
     )
     recordJrEvent(this.db, id, '卡片已创建', '想法已记录，尚未授权 AI 讨论或执行。', actor)
-    return this.getCard(id)
+    return this.readCard(id)
   }
 
   updateCardConfiguration(
@@ -109,7 +110,7 @@ export class JrStore {
     actor: JrControllerActor
   ): JrCard {
     requireJrController(actor)
-    const card = this.getCard(cardId)
+    const card = this.readCard(cardId)
     if (!CONFIGURABLE_STATUSES.has(card.status)) {
       throw new Error('执行批准后不能修改 harness 或模型；请返回规划中后重试。')
     }
@@ -129,12 +130,12 @@ export class JrStore {
       )
       .run(harness.id, model.id, model.label, jrNow(), cardId)
     recordJrEvent(this.db, cardId, 'AI 配置已更新', `${harness.label} · ${model.label}`, actor)
-    return this.getCard(cardId)
+    return this.readCard(cardId)
   }
 
-  transition(cardId: string, transition: JrCardTransition, actor: JrControllerActor): JrCard {
-    requireJrController(actor)
-    const card = this.getCard(cardId)
+  transition(cardId: string, transition: JrCardTransition, actor: JrActor): JrCard {
+    requireJrActor(actor)
+    const card = this.readCard(cardId)
     if (transition === 'begin-discussion') {
       requireJrCardState(card, 'idea', '开始讨论')
       requireJrAiConfiguration(card)
@@ -143,7 +144,8 @@ export class JrStore {
         this.db,
         cardId,
         jrTaskArtifactPath(cardId, 'discussion.md'),
-        `# Discussion\n\nHarness: ${card.harness}\nModel: ${card.model?.label}\n\nCapture decisions using JR-backed artifacts before planning.\n`
+        `# Discussion\n\nHarness: ${card.harness}\nModel: ${card.model?.label}\n\nCapture decisions using JR-backed artifacts before planning.\n`,
+        actor
       )
       recordJrEvent(
         this.db,
@@ -156,9 +158,9 @@ export class JrStore {
       requireJrCardState(card, 'discussion', '进入规划')
       requireJrAiConfiguration(card)
       setJrCardStatus(this.db, cardId, 'planning')
-      const plannedCard = this.getCard(cardId)
+      const plannedCard = this.readCard(cardId)
       for (const artifact of buildJrPlanningArtifacts(plannedCard)) {
-        upsertJrArtifact(this.db, cardId, artifact.path, artifact.content)
+        upsertJrArtifact(this.db, cardId, artifact.path, artifact.content, actor)
       }
       recordJrEvent(
         this.db,
@@ -168,6 +170,7 @@ export class JrStore {
         actor
       )
     } else {
+      requireJrController(actor)
       requireJrCardState(card, 'planning', '提交执行审批')
       requireJrAiConfiguration(card)
       this.execution.requireTarget(card)
@@ -180,7 +183,7 @@ export class JrStore {
         actor
       )
     }
-    return this.getCard(cardId)
+    return this.readCard(cardId)
   }
 
   updateCardExecutionTarget(
@@ -189,13 +192,13 @@ export class JrStore {
     actor: JrControllerActor
   ): JrCard {
     requireJrController(actor)
-    this.execution.updateTarget(this.getCard(cardId), input, actor)
-    return this.getCard(cardId)
+    this.execution.updateTarget(this.readCard(cardId), input, actor)
+    return this.readCard(cardId)
   }
 
   prepareExecution(cardId: string, actor: JrControllerActor): JrExecutionLaunchRequest {
     requireJrController(actor)
-    return this.execution.prepareLaunch(this.getCard(cardId), actor)
+    return this.execution.prepareLaunch(this.readCard(cardId), actor)
   }
 
   recordWorktreeCreated(
@@ -204,8 +207,8 @@ export class JrStore {
     actor: JrControllerActor
   ): JrCard {
     requireJrController(actor)
-    this.execution.recordWorktreeCreated(this.getCard(cardId), input, actor)
-    return this.getCard(cardId)
+    this.execution.recordWorktreeCreated(this.readCard(cardId), input, actor)
+    return this.readCard(cardId)
   }
 
   recordWorktreeProgress(
@@ -214,8 +217,8 @@ export class JrStore {
     actor: JrControllerActor
   ): JrCard {
     requireJrController(actor)
-    this.execution.recordWorktreeProgress(this.getCard(cardId), phase, actor)
-    return this.getCard(cardId)
+    this.execution.recordWorktreeProgress(this.readCard(cardId), phase, actor)
+    return this.readCard(cardId)
   }
 
   recordAgentStarted(
@@ -224,8 +227,8 @@ export class JrStore {
     actor: JrControllerActor
   ): JrCard {
     requireJrController(actor)
-    this.execution.recordAgentStarted(this.getCard(cardId), input, actor)
-    return this.getCard(cardId)
+    this.execution.recordAgentStarted(this.readCard(cardId), input, actor)
+    return this.readCard(cardId)
   }
 
   recordAgentStatus(
@@ -234,52 +237,52 @@ export class JrStore {
     actor: JrControllerActor
   ): JrCard {
     requireJrController(actor)
-    this.execution.recordAgentStatus(this.getCard(cardId), status, actor)
-    return this.getCard(cardId)
+    this.execution.recordAgentStatus(this.readCard(cardId), status, actor)
+    return this.readCard(cardId)
   }
 
   recordAgentExit(cardId: string, code: number, actor: JrControllerActor): JrCard {
     requireJrController(actor)
-    this.execution.recordAgentExit(this.getCard(cardId), code, actor)
-    return this.getCard(cardId)
+    this.execution.recordAgentExit(this.readCard(cardId), code, actor)
+    return this.readCard(cardId)
   }
 
   blockExecution(cardId: string, reason: string, actor: JrControllerActor): JrCard {
     requireJrController(actor)
-    const card = this.getCard(cardId)
+    const card = this.readCard(cardId)
     if (!this.review.block(card, reason, actor)) {
       this.execution.block(card, reason, actor)
     }
-    return this.getCard(cardId)
+    return this.readCard(cardId)
   }
 
   requestReview(cardId: string, snapshot: JrReviewSnapshot, actor: JrControllerActor): JrCard {
     requireJrController(actor)
-    this.review.requestReview(this.getCard(cardId), snapshot, actor)
-    return this.getCard(cardId)
+    this.review.requestReview(this.readCard(cardId), snapshot, actor)
+    return this.readCard(cardId)
   }
 
   passVerification(cardId: string, actor: JrControllerActor): JrCard {
     requireJrController(actor)
-    this.review.passVerification(this.getCard(cardId), actor)
-    return this.getCard(cardId)
+    this.review.passVerification(this.readCard(cardId), actor)
+    return this.readCard(cardId)
   }
 
   returnToExecution(cardId: string, actor: JrControllerActor): JrCard {
     requireJrController(actor)
-    this.review.returnToExecution(this.getCard(cardId), actor)
-    return this.getCard(cardId)
+    this.review.returnToExecution(this.readCard(cardId), actor)
+    return this.readCard(cardId)
   }
 
   prepareShip(cardId: string, actor: JrControllerActor): JrShipRequest {
     requireJrController(actor)
-    return this.review.prepareShip(this.getCard(cardId), actor)
+    return this.review.prepareShip(this.readCard(cardId), actor)
   }
 
   recordMerged(cardId: string, delivery: JrDeliveryRecord, actor: JrControllerActor): JrCard {
     requireJrController(actor)
-    this.review.recordMerged(this.getCard(cardId), delivery, actor)
-    return this.getCard(cardId)
+    this.review.recordMerged(this.readCard(cardId), delivery, actor)
+    return this.readCard(cardId)
   }
 
   private ensureDemoCard(): void {
@@ -296,16 +299,21 @@ export class JrStore {
     )
   }
 
-  private getCard(cardId: string): JrCard {
+  readCard(cardId: string): JrCard {
     return getJrCard(this.db, cardId)
   }
-}
 
-let jrStore: JrStore | null = null
-
-export function getJrStore(): JrStore {
-  if (!jrStore) {
-    jrStore = new JrStore(join(app.getPath('userData'), 'jr', 'jr.sqlite'))
+  writeArtifact(cardId: string, path: string, content: string, actor: JrActor): JrCard {
+    requireJrActor(actor)
+    this.readCard(cardId)
+    upsertJrArtifact(this.db, cardId, path, content, actor)
+    return this.readCard(cardId)
   }
-  return jrStore
+
+  recordEvent(cardId: string, kind: string, detail: string, actor: JrActor): JrCard {
+    requireJrActor(actor)
+    this.readCard(cardId)
+    recordJrEvent(this.db, cardId, kind, detail, actor)
+    return this.readCard(cardId)
+  }
 }

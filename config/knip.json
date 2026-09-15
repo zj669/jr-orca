@@ -13,6 +13,7 @@
     "src/main/ai-vault/session-scanner-worker-entry.ts",
     "src/main/ports/port-scan-command-worker-entry.ts",
     "src/main/ipc/parcel-watcher-process-entry.ts",
+    "src/main/jr/jr-mcp-stdio.ts",
     "src/main/hang-watchdog/main-thread-hang-watchdog-entry.ts",
     "src/main/agent-hooks/managed-agent-hook-controls.ts",
     "src/main/claude-accounts/keychain.ts",

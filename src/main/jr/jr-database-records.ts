@@ -26,6 +26,17 @@ export function optionalJrDatabaseString(row: JrDatabaseRow, key: string): strin
   return typeof value === 'string' ? value : null
 }
 
+export function requireJrDatabaseInteger(row: JrDatabaseRow, key: string): number {
+  const value = row[key]
+  if (typeof value === 'number' && Number.isInteger(value)) {
+    return value
+  }
+  if (typeof value === 'bigint' && value <= BigInt(Number.MAX_SAFE_INTEGER)) {
+    return Number(value)
+  }
+  throw new Error(`JR database field ${key} is invalid.`)
+}
+
 function isJrCardStatus(value: string): value is JrCardStatus {
   return JR_CARD_STATUSES.some((candidate) => candidate === value)
 }

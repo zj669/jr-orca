@@ -221,10 +221,10 @@ describe('electron-builder config', () => {
 
   // Why: without the unpacked entry the watcher client silently falls back to
   // in-process @parcel/watcher, reintroducing the #7547 main-process crash.
-  it('unpacks the forked parcel-watcher process entry', () => {
-    expect(electronBuilderConfig.asarUnpack).toEqual(
-      expect.arrayContaining(['out/main/parcel-watcher-process-entry.js'])
-    )
+  it('unpacks the JR Trellis MCP stdio entry', async () => {
+    expect(electronBuilderConfig.asarUnpack).toContain('out/main/jr-mcp-stdio.js')
+    const viteConfig = await readFile(join(REPO_ROOT, 'electron.vite.config.ts'), 'utf8')
+    expect(viteConfig).toMatch(/'jr-mcp-stdio':\s*resolve\(/)
   })
 
   it('unpacks the replaceable WSL transcript filesystem process entry', async () => {

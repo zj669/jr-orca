@@ -123,6 +123,7 @@ export type JrArtifact = {
   cardId: string
   path: string
   content: string
+  version: number
   updatedAt: string
 }
 
@@ -144,10 +145,18 @@ export type JrBoardSnapshot = {
   }[]
 }
 
-export type JrControllerActor = {
-  kind: 'human-controller' | 'master-controller'
-  id: string
-}
+export type {
+  JrActor,
+  JrControllerActor,
+  JrTaskAgentActor,
+  JrTaskAgentTransition
+} from './jr-actors'
+export {
+  isJrActor,
+  isJrControllerActor,
+  isJrTaskAgentTransition,
+  JR_TASK_AGENT_TRANSITIONS
+} from './jr-actors'
 
 export type JrCreateCardInput = {
   title: string

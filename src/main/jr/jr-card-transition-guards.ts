@@ -1,10 +1,14 @@
-import type { JrCard, JrCardStatus, JrControllerActor } from '../../shared/jr/jr-types'
+import type { JrActor, JrCard, JrCardStatus, JrControllerActor } from '../../shared/jr/jr-types'
 
-export function requireJrController(actor: JrControllerActor): void {
-  if (
-    (actor.kind !== 'human-controller' && actor.kind !== 'master-controller') ||
-    actor.id.trim().length === 0
-  ) {
+export function requireJrActor(actor: JrActor): void {
+  if (actor.id.trim().length === 0) {
+    throw new Error('JR actor id is required.')
+  }
+}
+
+export function requireJrController(actor: JrActor): asserts actor is JrControllerActor {
+  requireJrActor(actor)
+  if (actor.kind !== 'human-controller' && actor.kind !== 'master-controller') {
     throw new Error('该操作需要具备 controller 能力的 actor。')
   }
 }

@@ -13,6 +13,8 @@ export const jrApi = {
   prepareExecution: (cardId, actor) => ipcRenderer.invoke('jr:prepareExecution', cardId, actor),
   recordWorktreeCreated: (cardId, input, actor) =>
     ipcRenderer.invoke('jr:recordWorktreeCreated', cardId, input, actor),
+  seedTrellisSession: (cardId, worktreePath) =>
+    ipcRenderer.invoke('jr:seedTrellisSession', cardId, worktreePath),
   recordWorktreeProgress: (cardId, phase, actor) =>
     ipcRenderer.invoke('jr:recordWorktreeProgress', cardId, phase, actor),
   recordAgentStarted: (cardId, input, actor) =>

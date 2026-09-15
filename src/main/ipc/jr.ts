@@ -16,8 +16,9 @@ import {
   type JrUpdateCardInput,
   type JrUpdateExecutionTargetInput
 } from '../../shared/jr/jr-types'
-import { getJrStore, type JrStore } from '../jr/jr-store'
+import { getJrStore, type JrStore } from '../jr/jr-store-access'
 import { mergeJrBranchIntoBase } from '../jr/jr-local-base-merge'
+import { seedJrTrellisHarnessSession } from '../jr/jr-trellis-session-seed'
 
 type JrHandlerStore = Pick<
   JrStore,
@@ -29,6 +30,7 @@ type JrHandlerStore = Pick<
   | 'prepareExecution'
   | 'recordWorktreeCreated'
   | 'recordWorktreeProgress'
+  | 'readCard'
   | 'recordAgentStarted'
   | 'recordAgentStatus'
   | 'recordAgentExit'
@@ -226,6 +228,12 @@ export function registerJrHandlers(store: JrHandlerStore = getJrStore()): void {
         parseWorktreeInput(rawInput),
         parseActor(rawActor)
       )
+  )
+  ipcMain.handle('jr:seedTrellisSession', (_event, cardId: unknown, worktreePath: unknown) =>
+    seedJrTrellisHarnessSession(
+      store.readCard(requireString(cardId, 'card id')),
+      requireString(worktreePath, 'worktree path')
+    )
   )
   ipcMain.handle(
     'jr:recordWorktreeProgress',

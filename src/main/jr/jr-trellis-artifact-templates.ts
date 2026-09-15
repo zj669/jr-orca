@@ -18,7 +18,7 @@ export function buildJrPlanningArtifacts(
     {
       path: 'spec/jr-controller.md',
       content:
-        '# JR controller contract\n\nTask harness agents use JR tools for workflow/spec/task data and cannot self-authorize execution or merge.\n'
+        '# JR controller contract\n\nTask harness agents use JR MCP tools for workflow/spec/task data and cannot self-authorize execution or merge.\n'
     },
     {
       path: jrTaskArtifactPath(card.id, 'prd.md'),
@@ -31,7 +31,7 @@ export function buildJrPlanningArtifacts(
     {
       path: jrTaskArtifactPath(card.id, 'implement.md'),
       content:
-        '# Implementation checklist\n\n1. Read JR-backed PRD and specs.\n2. Implement only the approved scope.\n3. Run appropriate checks.\n4. Request review; do not merge.\n'
+        '# Implementation checklist\n\n1. Read JR-backed PRD and specs through jr-trellis MCP tools.\n2. Implement only the approved scope.\n3. Run appropriate checks.\n4. Call jr_card_request_transition with request-review; do not merge.\n'
     }
   ]
 }
@@ -49,7 +49,7 @@ Model: ${card.model?.label ?? 'unconfigured'}
 
 ${card.description}
 
-Use the approved scope and acceptance criteria below. JR's SQLite database is canonical for Trellis data: this prompt is its launch-time projection. Do not treat .trellis files as a writable source of truth. Work only in this Orca worktree, run appropriate checks, and request review when ready. Do not merge.
+Use the approved scope and acceptance criteria below. JR's SQLite database is canonical for Trellis data: this prompt is a launch-time projection. Read and write workflow/spec/task artifacts through the jr-trellis MCP tools (\`jr_workflow_get\`, \`jr_specs_list\`, \`jr_specs_get\`, \`jr_task_get\`, \`jr_artifacts_list\`, \`jr_artifacts_get\`, \`jr_artifact_upsert\`, \`jr_journal_append\`, \`jr_research_append\`, \`jr_card_request_transition\`). Follow skills \`jr-trellis-plan\` and \`jr-trellis-implement\`. Do not treat .trellis files as a writable source of truth. Work only in this Orca worktree, run appropriate checks, and request review with \`jr_card_request_transition\` / \`request-review\` when ready. You cannot promote this card to 待批准执行, 创建工作树, 交付中, or 已合并. Do not merge.
 
 ## JR-backed Trellis artifacts
 ${artifactContext}

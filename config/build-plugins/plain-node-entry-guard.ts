@@ -24,7 +24,8 @@ const PLAIN_NODE_ENTRY_NAMES = [
   'parcel-watcher-process-entry',
   'computer-sidecar',
   'wsl-transcript-fs-process-entry',
-  'agent-hooks/managed-agent-hook-controls'
+  'agent-hooks/managed-agent-hook-controls',
+  'jr-mcp-stdio'
 ] as const
 
 // Entries executed as worker threads of the main process. Electron's module is

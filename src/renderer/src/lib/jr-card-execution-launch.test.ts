@@ -30,6 +30,7 @@ describe('JR card execution launch', () => {
       | null = null
     const recordWorktreeProgress = vi.fn().mockResolvedValue(undefined)
     const recordWorktreeCreated = vi.fn().mockResolvedValue(undefined)
+    const seedTrellisSession = vi.fn().mockResolvedValue(undefined)
     const recordAgentStarted = vi.fn().mockResolvedValue(undefined)
     const launchAgent = vi
       .fn()
@@ -55,6 +56,7 @@ describe('JR card execution launch', () => {
       },
       recordWorktreeProgress,
       recordWorktreeCreated,
+      seedTrellisSession,
       recordAgentStarted,
       createId: () => 'creation-1'
     })
@@ -66,6 +68,10 @@ describe('JR card execution launch', () => {
       'card-1',
       { id: 'repo-1::/worktree', path: '/worktree', branch: 'jr/launch' },
       controller
+    )
+    expect(seedTrellisSession).toHaveBeenCalledWith('card-1', '/worktree')
+    expect(seedTrellisSession.mock.invocationCallOrder[0]).toBeLessThan(
+      launchAgent.mock.invocationCallOrder[0]
     )
     expect(launchAgent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -193,6 +199,7 @@ function idleDependencies() {
     subscribeWorktreeProgress: () => vi.fn(),
     recordWorktreeProgress: vi.fn().mockResolvedValue(undefined),
     recordWorktreeCreated: vi.fn().mockResolvedValue(undefined),
+    seedTrellisSession: vi.fn().mockResolvedValue(undefined),
     recordAgentStarted: vi.fn().mockResolvedValue(undefined),
     recordAgentStatus: vi.fn().mockResolvedValue(undefined),
     recordAgentExit: vi.fn().mockResolvedValue(undefined),

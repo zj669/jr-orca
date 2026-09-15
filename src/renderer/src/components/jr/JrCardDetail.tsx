@@ -304,7 +304,10 @@ export function JrCardDetail({
           <div className="mt-3 space-y-2">
             {card.artifacts.map((artifact) => (
               <div key={artifact.id} className="rounded-md border bg-muted/30 p-2">
-                <p className="font-mono text-xs">{artifact.path}</p>
+                <p className="font-mono text-xs">
+                  {artifact.path}
+                  {artifact.version > 1 ? ` · v${artifact.version}` : ''}
+                </p>
                 <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-xs text-muted-foreground">
                   {artifact.content}
                 </p>

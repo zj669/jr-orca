@@ -150,6 +150,8 @@ describe('JrStore', () => {
       }
     })
     expect(launch.prompt).toContain(`tasks/${card.id}/prd.md`)
+    expect(launch.prompt).toContain('jr_artifact_upsert')
+    expect(launch.prompt).toContain('jr-trellis-implement')
     expect(store.listBoard().cards.find((item) => item.id === card.id)?.status).toBe(
       'creating_worktree'
     )

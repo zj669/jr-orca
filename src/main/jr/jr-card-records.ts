@@ -4,13 +4,15 @@ import {
   isJrDeliveryRecord,
   isJrHarness,
   isJrReviewSnapshot,
+  type JrActor,
+  type JrArtifact,
   type JrCard,
-  type JrControllerActor,
   type JrModelChoice
 } from '../../shared/jr/jr-types'
 import {
   optionalJrDatabaseString,
   requireJrDatabaseCardStatus,
+  requireJrDatabaseInteger,
   requireJrDatabaseRow,
   requireJrDatabaseString,
   type JrDatabaseRow
@@ -95,13 +97,53 @@ export function upsertJrArtifact(
   db: SyncDatabase,
   cardId: string,
   path: string,
-  content: string
-): void {
+  content: string,
+  actor: JrActor
+): JrArtifact {
+  const timestamp = jrNow()
+  const existing = db
+    .prepare('SELECT id, version FROM jr_artifacts WHERE card_id = ? AND path = ?')
+    .get(cardId, path)
+  const current =
+    existing === undefined ? null : requireJrDatabaseRow(existing, 'JR artifact row is invalid.')
+  const version = current ? requireJrDatabaseInteger(current, 'version') + 1 : 1
+  const artifactId = current ? requireJrDatabaseString(current, 'id') : randomUUID()
+  if (current) {
+    db.prepare('UPDATE jr_artifacts SET content = ?, version = ?, updated_at = ? WHERE id = ?').run(
+      content,
+      version,
+      timestamp,
+      artifactId
+    )
+  } else {
+    db.prepare(
+      `INSERT INTO jr_artifacts (id, card_id, path, content, version, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(artifactId, cardId, path, content, version, timestamp)
+  }
   db.prepare(
-    `INSERT INTO jr_artifacts (id, card_id, path, content, updated_at)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(card_id, path) DO UPDATE SET content = excluded.content, updated_at = excluded.updated_at`
-  ).run(randomUUID(), cardId, path, content, jrNow())
+    `INSERT INTO jr_artifact_revisions (
+       id, artifact_id, card_id, path, version, content, actor, created_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    randomUUID(),
+    artifactId,
+    cardId,
+    path,
+    version,
+    content,
+    `${actor.kind}:${actor.id}`,
+    timestamp
+  )
+  recordJrEvent(db, cardId, 'artifact.upserted', `${path} v${version}`, actor)
+  return {
+    id: artifactId,
+    cardId,
+    path,
+    content,
+    version,
+    updatedAt: timestamp
+  }
 }
 
 export function recordJrEvent(
@@ -109,7 +151,7 @@ export function recordJrEvent(
   cardId: string,
   kind: string,
   detail: string,
-  actor: JrControllerActor
+  actor: JrActor
 ): void {
   db.prepare(
     `INSERT INTO jr_events (id, card_id, kind, detail, actor, created_at)

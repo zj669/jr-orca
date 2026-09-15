@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import SyncDatabase from '../sqlite/sync-database'
+import { optionalJrDatabaseString, requireJrDatabaseRow } from './jr-database-records'
 
 export function openJrSqlite(databasePath: string): SyncDatabase {
   mkdirSync(dirname(databasePath), { recursive: true })
@@ -38,8 +39,20 @@ export function openJrSqlite(databasePath: string): SyncDatabase {
         card_id TEXT NOT NULL REFERENCES jr_cards(id) ON DELETE CASCADE,
         path TEXT NOT NULL,
         content TEXT NOT NULL,
+        version INTEGER NOT NULL DEFAULT 1,
         updated_at TEXT NOT NULL,
         UNIQUE(card_id, path)
+      );
+
+      CREATE TABLE IF NOT EXISTS jr_artifact_revisions (
+        id TEXT PRIMARY KEY,
+        artifact_id TEXT NOT NULL,
+        card_id TEXT NOT NULL REFERENCES jr_cards(id) ON DELETE CASCADE,
+        path TEXT NOT NULL,
+        version INTEGER NOT NULL,
+        content TEXT NOT NULL,
+        actor TEXT NOT NULL,
+        created_at TEXT NOT NULL
       );
 
       CREATE TABLE IF NOT EXISTS jr_events (
@@ -51,5 +64,21 @@ export function openJrSqlite(databasePath: string): SyncDatabase {
         created_at TEXT NOT NULL
       );
     `)
+  ensureJrArtifactRevisionSchema(db)
   return db
+}
+
+export function ensureJrArtifactRevisionSchema(db: SyncDatabase): void {
+  const columns = new Set(
+    db
+      .prepare('PRAGMA table_info(jr_artifacts)')
+      .all()
+      .map(
+        (row) =>
+          optionalJrDatabaseString(requireJrDatabaseRow(row, 'JR schema is invalid.'), 'name') ?? ''
+      )
+  )
+  if (!columns.has('version')) {
+    db.exec('ALTER TABLE jr_artifacts ADD COLUMN version INTEGER NOT NULL DEFAULT 1')
+  }
 }

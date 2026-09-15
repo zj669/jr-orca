@@ -14,7 +14,11 @@ const { handlers, ipcHandleMock } = vi.hoisted(() => ({
 }))
 
 vi.mock('electron', () => ({
-  app: { getPath: () => '/unused-in-ipc-test' },
+  app: {
+    getPath: () => '/unused-in-ipc-test',
+    getAppPath: () => '/unused-in-ipc-test',
+    isPackaged: false
+  },
   ipcMain: { handle: ipcHandleMock }
 }))
 
@@ -60,7 +64,7 @@ describe('JR IPC', () => {
     const store = await createStore()
     registerJrHandlers(store)
 
-    expect(ipcHandleMock).toHaveBeenCalledTimes(18)
+    expect(ipcHandleMock).toHaveBeenCalledTimes(19)
 
     await invoke(
       'jr:createCard',

@@ -35,7 +35,8 @@ export class JrReviewStore {
       this.db,
       card.id,
       jrTaskArtifactPath(card.id, 'review.md'),
-      reviewMarkdown(snapshot)
+      reviewMarkdown(snapshot),
+      actor
     )
     recordJrEvent(
       this.db,
@@ -116,7 +117,8 @@ export class JrReviewStore {
       this.db,
       card.id,
       jrTaskArtifactPath(card.id, 'journal.md'),
-      `# ${card.title} — finish\n\nMerged into ${delivery.mergedInto} via ${delivery.method}.\n`
+      `# ${card.title} — finish\n\nMerged into ${delivery.mergedInto} via ${delivery.method}.\n`,
+      actor
     )
     recordJrEvent(
       this.db,
