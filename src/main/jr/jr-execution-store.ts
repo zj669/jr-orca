@@ -65,6 +65,9 @@ export class JrExecutionStore {
     if (!card.model) {
       throw new Error('JR harness 模型未配置。')
     }
+    if (!card.harness) {
+      throw new Error('JR harness 未配置。')
+    }
     setJrCardStatus(this.db, card.id, 'creating_worktree')
     this.db
       .prepare('UPDATE jr_cards SET worktree_phase = ?, updated_at = ? WHERE id = ?')
