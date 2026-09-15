@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { JrExecutionLaunchRequest } from '../../../../shared/jr/jr-types'
+import type { JrExecutionLaunchRequest } from '../../../shared/jr/jr-types'
 
 vi.mock('@/lib/new-workspace', () => ({
   getWorkspaceSeedName: vi.fn()

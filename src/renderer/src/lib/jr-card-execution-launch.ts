@@ -1,15 +1,15 @@
 import { getWorkspaceSeedName } from '@/lib/new-workspace'
 import { launchAgentBackgroundSession } from '@/lib/launch-agent-background-session'
 import { useAppStore } from '@/store'
-import { jrHarnessAgent } from '../../../../shared/jr/jr-harness-agent'
+import { jrHarnessAgent } from '../../../shared/jr/jr-harness-agent'
 import type {
   JrAgentLifecycleState,
   JrControllerActor,
   JrExecutionLaunchRequest,
   JrRecordAgentSessionInput,
   JrRecordWorktreeInput
-} from '../../../../shared/jr/jr-types'
-import type { TuiAgent } from '../../../../shared/tui-agent'
+} from '../../../shared/jr/jr-types'
+import type { TuiAgent } from '../../../shared/tui-agent'
 
 type JrWorktreeProgress = {
   creationId?: string
