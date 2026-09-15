@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { JrControllerActor } from '../../shared/jr/jr-types'
+import type { JrCard, JrControllerActor, JrReviewSnapshot } from '../../shared/jr/jr-types'
 import { JrStore } from './jr-store'
 
 const temporaryDirectories: string[] = []
@@ -200,20 +200,7 @@ describe('JrStore', () => {
   it('captures an Orca review snapshot and only ships after controller merge approval', async () => {
     const store = await createStore()
     const card = await reachExecuting(store, 'Review the worktree')
-    const snapshot = {
-      worktreeId: card.execution.worktree?.id ?? '',
-      branch: 'jr/worktree',
-      baseRef: 'main',
-      headOid: 'abc',
-      mergeBase: 'def',
-      changedFiles: 3,
-      commitsAhead: 2,
-      commitsBehind: 0,
-      uncommittedFiles: 0,
-      conflicted: false,
-      compareStatus: 'ready' as const,
-      capturedAt: '2026-01-01T00:00:00.000Z'
-    }
+    const snapshot = jrReviewSnapshot(card, { changedFiles: 3, commitsAhead: 2 })
 
     const verifying = store.requestReview(card.id, snapshot, controller)
     expect(verifying.status).toBe('verifying')
@@ -247,27 +234,23 @@ describe('JrStore', () => {
     )
   })
 
+  it('enters verifying after a successful harness exit plus review snapshot', async () => {
+    const store = await createStore()
+    const card = await reachExecuting(store, 'Auto verify after exit')
+    store.recordAgentExit(card.id, 0, controller)
+    expect(store.listBoard().cards.find((item) => item.id === card.id)?.status).toBe('executing')
+
+    const verifying = store.requestReview(card.id, jrReviewSnapshot(card), controller)
+    expect(verifying.status).toBe('verifying')
+    expect(verifying.artifacts.map((artifact) => artifact.path)).toContain(
+      `tasks/${card.id}/review.md`
+    )
+  })
+
   it('rejects verification while the worktree is dirty and can return to execution', async () => {
     const store = await createStore()
     const card = await reachExecuting(store, 'Dirty review')
-    store.requestReview(
-      card.id,
-      {
-        worktreeId: card.execution.worktree?.id ?? '',
-        branch: 'jr/worktree',
-        baseRef: 'main',
-        headOid: 'abc',
-        mergeBase: 'def',
-        changedFiles: 1,
-        commitsAhead: 1,
-        commitsBehind: 0,
-        uncommittedFiles: 4,
-        conflicted: false,
-        compareStatus: 'ready',
-        capturedAt: '2026-01-01T00:00:00.000Z'
-      },
-      controller
-    )
+    store.requestReview(card.id, jrReviewSnapshot(card, { uncommittedFiles: 4 }), controller)
 
     expect(() => store.passVerification(card.id, controller)).toThrow('还有未提交变更')
     const executing = store.returnToExecution(card.id, controller)
@@ -314,4 +297,25 @@ async function reachExecuting(store: JrStore, title: string) {
     },
     controller
   )
+}
+
+function jrReviewSnapshot(
+  card: JrCard,
+  overrides: Partial<JrReviewSnapshot> = {}
+): JrReviewSnapshot {
+  return {
+    worktreeId: card.execution.worktree?.id ?? '',
+    branch: 'jr/worktree',
+    baseRef: 'main',
+    headOid: 'abc',
+    mergeBase: 'def',
+    changedFiles: 1,
+    commitsAhead: 1,
+    commitsBehind: 0,
+    uncommittedFiles: 0,
+    conflicted: false,
+    compareStatus: 'ready',
+    capturedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides
+  }
 }

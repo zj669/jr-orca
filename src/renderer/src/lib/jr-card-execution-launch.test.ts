@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { JrExecutionLaunchRequest } from '../../../shared/jr/jr-types'
+import type { JrControllerActor, JrExecutionLaunchRequest } from '../../../shared/jr/jr-types'
 
 vi.mock('@/lib/new-workspace', () => ({
   getWorkspaceSeedName: vi.fn()
@@ -13,7 +13,7 @@ vi.mock('@/store', () => ({
 
 import { createJrCardExecutionLauncher } from './jr-card-execution-launch'
 
-const controller = { kind: 'human-controller' as const, id: 'walker' }
+const controller: JrControllerActor = { kind: 'human-controller', id: 'walker' }
 const request: JrExecutionLaunchRequest = {
   cardId: 'card-1',
   title: 'Launch JR task',
@@ -42,6 +42,7 @@ describe('JR card execution launch', () => {
         }
       )
     const launcher = createJrCardExecutionLauncher({
+      ...idleDependencies(),
       prepareExecution: vi.fn().mockResolvedValue(request),
       createWorktree: vi.fn().mockImplementation(async (args) => {
         progressListener?.({ creationId: args.creationId, phase: 'fetching' })
@@ -55,9 +56,6 @@ describe('JR card execution launch', () => {
       recordWorktreeProgress,
       recordWorktreeCreated,
       recordAgentStarted,
-      recordAgentStatus: vi.fn().mockResolvedValue(undefined),
-      recordAgentExit: vi.fn().mockResolvedValue(undefined),
-      blockExecution: vi.fn().mockResolvedValue(undefined),
       createId: () => 'creation-1'
     })
 
@@ -86,55 +84,90 @@ describe('JR card execution launch', () => {
     )
   })
 
-  it('records a nonzero harness exit as blocked through the lifecycle subscription', async () => {
+  it('auto-requests verification after a successful harness exit', async () => {
+    let reportExit: (code: number) => void = () => {
+      throw new Error('The launcher did not subscribe to the harness exit lifecycle.')
+    }
+    const recordAgentExit = vi.fn().mockResolvedValue(undefined)
+    const requestReviewOnSuccess = vi.fn().mockResolvedValue(undefined)
+    const launcher = createJrCardExecutionLauncher({
+      ...idleDependencies(),
+      launchAgent: vi.fn().mockImplementation(async (args: { onExit: (code: number) => void }) => {
+        reportExit = args.onExit
+        return { agent: 'cursor', tabId: 'tab-1', paneKey: 'tab-1:pane-1', ptyId: 'pty-1' }
+      }),
+      recordAgentExit,
+      requestReviewOnSuccess
+    })
+
+    await launcher.launch(request.cardId, controller)
+    reportExit(0)
+    await vi.waitFor(() => {
+      expect(requestReviewOnSuccess).toHaveBeenCalledWith('card-1', controller)
+    })
+    expect(recordAgentExit).toHaveBeenCalledWith('card-1', 0, controller)
+    expect(recordAgentExit.mock.invocationCallOrder[0]).toBeLessThan(
+      requestReviewOnSuccess.mock.invocationCallOrder[0]
+    )
+  })
+
+  it('blocks when auto-verification fails after a successful harness exit', async () => {
     let reportExit: (code: number) => void = () => {
       throw new Error('The launcher did not subscribe to the harness exit lifecycle.')
     }
     const blockExecution = vi.fn().mockResolvedValue(undefined)
     const launcher = createJrCardExecutionLauncher({
-      prepareExecution: vi.fn().mockResolvedValue(request),
-      createWorktree: vi
-        .fn()
-        .mockResolvedValue({ id: 'repo-1::/worktree', path: '/worktree', branch: 'jr/launch' }),
+      ...idleDependencies(),
       launchAgent: vi.fn().mockImplementation(async (args: { onExit: (code: number) => void }) => {
         reportExit = args.onExit
         return { agent: 'cursor', tabId: 'tab-1', paneKey: 'tab-1:pane-1', ptyId: 'pty-1' }
       }),
-      subscribeWorktreeProgress: () => vi.fn(),
-      recordWorktreeProgress: vi.fn().mockResolvedValue(undefined),
-      recordWorktreeCreated: vi.fn().mockResolvedValue(undefined),
-      recordAgentStarted: vi.fn().mockResolvedValue(undefined),
-      recordAgentStatus: vi.fn().mockResolvedValue(undefined),
-      recordAgentExit: vi.fn().mockResolvedValue(undefined),
-      blockExecution,
-      createId: () => 'creation-3'
+      requestReviewOnSuccess: vi.fn().mockRejectedValue(new Error('git.status failed')),
+      blockExecution
     })
 
     await launcher.launch(request.cardId, controller)
-    reportExit?.(2)
-    await Promise.resolve()
+    reportExit(0)
+    await vi.waitFor(() => {
+      expect(blockExecution).toHaveBeenCalledWith('card-1', 'git.status failed', controller)
+    })
+  })
 
-    expect(blockExecution).toHaveBeenCalledWith(
-      'card-1',
-      'Orca harness exited with code 2.',
-      controller
-    )
+  it('records a nonzero harness exit as blocked through the lifecycle subscription', async () => {
+    let reportExit: (code: number) => void = () => {
+      throw new Error('The launcher did not subscribe to the harness exit lifecycle.')
+    }
+    const blockExecution = vi.fn().mockResolvedValue(undefined)
+    const requestReviewOnSuccess = vi.fn()
+    const launcher = createJrCardExecutionLauncher({
+      ...idleDependencies(),
+      launchAgent: vi.fn().mockImplementation(async (args: { onExit: (code: number) => void }) => {
+        reportExit = args.onExit
+        return { agent: 'cursor', tabId: 'tab-1', paneKey: 'tab-1:pane-1', ptyId: 'pty-1' }
+      }),
+      requestReviewOnSuccess,
+      blockExecution
+    })
+
+    await launcher.launch(request.cardId, controller)
+    reportExit(2)
+    await vi.waitFor(() => {
+      expect(blockExecution).toHaveBeenCalledWith(
+        'card-1',
+        'Orca harness exited with code 2.',
+        controller
+      )
+    })
+    expect(requestReviewOnSuccess).not.toHaveBeenCalled()
   })
 
   it('persists a blocked card when native worktree creation fails', async () => {
     const blockExecution = vi.fn().mockResolvedValue(undefined)
     const launcher = createJrCardExecutionLauncher({
-      prepareExecution: vi.fn().mockResolvedValue(request),
+      ...idleDependencies(),
       createWorktree: vi.fn().mockRejectedValue(new Error('base ref is unavailable')),
       launchAgent: vi.fn(),
-      subscribeWorktreeProgress: () => vi.fn(),
-      recordWorktreeProgress: vi.fn().mockResolvedValue(undefined),
-      recordWorktreeCreated: vi.fn().mockResolvedValue(undefined),
-      recordAgentStarted: vi.fn().mockResolvedValue(undefined),
-      recordAgentStatus: vi.fn().mockResolvedValue(undefined),
-      recordAgentExit: vi.fn().mockResolvedValue(undefined),
-      blockExecution,
-      createId: () => 'creation-2'
+      blockExecution
     })
 
     await expect(launcher.launch(request.cardId, controller)).rejects.toThrow(
@@ -144,3 +177,27 @@ describe('JR card execution launch', () => {
     expect(blockExecution).toHaveBeenCalledWith('card-1', 'base ref is unavailable', controller)
   })
 })
+
+function idleDependencies() {
+  return {
+    prepareExecution: vi.fn().mockResolvedValue(request),
+    createWorktree: vi
+      .fn()
+      .mockResolvedValue({ id: 'repo-1::/worktree', path: '/worktree', branch: 'jr/launch' }),
+    launchAgent: vi.fn().mockResolvedValue({
+      agent: 'cursor',
+      tabId: 'tab-1',
+      paneKey: 'tab-1:pane-1',
+      ptyId: 'pty-1'
+    }),
+    subscribeWorktreeProgress: () => vi.fn(),
+    recordWorktreeProgress: vi.fn().mockResolvedValue(undefined),
+    recordWorktreeCreated: vi.fn().mockResolvedValue(undefined),
+    recordAgentStarted: vi.fn().mockResolvedValue(undefined),
+    recordAgentStatus: vi.fn().mockResolvedValue(undefined),
+    recordAgentExit: vi.fn().mockResolvedValue(undefined),
+    requestReviewOnSuccess: vi.fn().mockResolvedValue(undefined),
+    blockExecution: vi.fn().mockResolvedValue(undefined),
+    createId: () => 'creation-test'
+  }
+}

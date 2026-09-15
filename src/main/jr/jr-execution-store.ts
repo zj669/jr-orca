@@ -194,7 +194,7 @@ export class JrExecutionStore {
       this.db,
       card.id,
       'Harness 会话已退出',
-      `Agent process exited with code ${code}; card remains 执行中 until review is requested.`,
+      `Agent process exited with code ${code}.`,
       actor
     )
   }

@@ -60,6 +60,7 @@ type JrExecutionLaunchDependencies = {
     actor: JrControllerActor
   ) => Promise<unknown>
   recordAgentExit: (cardId: string, code: number, actor: JrControllerActor) => Promise<unknown>
+  requestReviewOnSuccess: (cardId: string, actor: JrControllerActor) => Promise<unknown>
   blockExecution: (cardId: string, reason: string, actor: JrControllerActor) => Promise<unknown>
   createId: () => string
 }
@@ -106,7 +107,7 @@ export function createJrCardExecutionLauncher(dependencies: JrExecutionLaunchDep
           onExit: (code) =>
             reportJrLifecycle(
               code === 0
-                ? dependencies.recordAgentExit(request.cardId, code, actor)
+                ? completeSuccessfulHarnessExit(dependencies, request.cardId, code, actor)
                 : dependencies.blockExecution(
                     request.cardId,
                     `Orca harness exited with code ${code}.`,
@@ -202,6 +203,10 @@ export async function launchJrCardExecution(
     recordAgentStatus: (id, status, controller) =>
       window.api.jr.recordAgentStatus(id, status, controller),
     recordAgentExit: (id, code, controller) => window.api.jr.recordAgentExit(id, code, controller),
+    requestReviewOnSuccess: async (id, controller) => {
+      const { launchJrCardReview } = await import('./jr-card-review-desktop')
+      await launchJrCardReview(id, controller)
+    },
     blockExecution: (id, reason, controller) =>
       window.api.jr.blockExecution(id, reason, controller),
     createId: () => crypto.randomUUID()
@@ -211,4 +216,24 @@ export async function launchJrCardExecution(
 
 function reportJrLifecycle(promise: Promise<unknown>, event: string): void {
   void promise.catch((error: unknown) => console.error(`JR failed to record ${event}`, error))
+}
+
+async function completeSuccessfulHarnessExit(
+  dependencies: JrExecutionLaunchDependencies,
+  cardId: string,
+  code: number,
+  actor: JrControllerActor
+): Promise<void> {
+  await dependencies.recordAgentExit(cardId, code, actor)
+  try {
+    await dependencies.requestReviewOnSuccess(cardId, actor)
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'JR 自动验证失败。'
+    try {
+      await dependencies.blockExecution(cardId, reason, actor)
+    } catch (blockError) {
+      console.error('JR failed to persist verification failure', blockError)
+    }
+    throw error
+  }
 }

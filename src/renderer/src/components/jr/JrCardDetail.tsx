@@ -326,7 +326,7 @@ function statusMessage(status: JrCard['status']): string {
     return 'Orca 正在创建 worktree。'
   }
   if (status === 'executing') {
-    return 'Harness 已启动。完成后请求验证。'
+    return 'Harness 已启动。退出后会自动进入验证。'
   }
   if (status === 'verifying') {
     return '正在使用 Orca Review 核对 diff。'
