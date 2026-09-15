@@ -23,7 +23,7 @@ const LOCAL_CONTROLLER: JrControllerActor = { kind: 'human-controller', id: 'loc
 
 const LANES: ReadonlyArray<{ status: JrCardStatus; label: string; description: string }> = [
   { status: 'idea', label: '想法', description: '尚未授权 AI 工作' },
-  { status: 'discussion', label: '讨论中', description: '只读规划会话' },
+  { status: 'discussion', label: '讨论中', description: '只读计划上下文' },
   { status: 'planning', label: '规划中', description: 'Trellis Plan' },
   {
     status: 'pending_execution_approval',
@@ -44,7 +44,7 @@ function cardAction(
   transition: 'begin-discussion' | 'begin-planning' | 'request-execution-approval'
 } | null {
   if (card.status === 'idea') {
-    return { label: '开始 AI 讨论', transition: 'begin-discussion' }
+    return { label: '创建讨论上下文', transition: 'begin-discussion' }
   }
   if (card.status === 'discussion') {
     return { label: '进入规划', transition: 'begin-planning' }
@@ -335,7 +335,7 @@ export default function JrBoardDrawer({
                         <Bot className="size-3.5" />
                         {selectedCard.harness && selectedCard.model
                           ? `${selectedCard.harness} · ${selectedCard.model.label}`
-                          : '选择配置后才能开始 AI 讨论'}
+                          : '选择配置后才能创建讨论上下文'}
                       </div>
                       {selectedAction ? (
                         <Button
