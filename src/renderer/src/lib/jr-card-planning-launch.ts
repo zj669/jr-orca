@@ -36,6 +36,7 @@ export async function launchJrPlanningSession(
     prompt: buildJrPlanningPrompt(card, mode),
     sessionOptions: { model: card.model.id },
     sessionOptionsOverrideAgentArgs: true,
+    extraAgentArgs: jrHarnessAgent(card.harness) === 'cursor' ? '--trust' : undefined,
     title: `JR ${mode === 'discussion' ? '讨论' : '规划'} · ${card.title}`,
     launchSource: 'unknown'
   })

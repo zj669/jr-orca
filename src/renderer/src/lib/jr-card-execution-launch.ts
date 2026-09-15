@@ -10,6 +10,7 @@ import type {
   JrRecordWorktreeInput
 } from '../../../shared/jr/jr-types'
 import { findJrExistingWorkspace } from './jr-existing-workspace'
+import { createJrHarnessPtyFailureScanner } from './jr-harness-pty-failure'
 
 type JrWorktreeProgress = {
   creationId?: string
@@ -35,7 +36,9 @@ type JrExecutionLaunchDependencies = {
     sessionOptions: { model: string }
     sessionOptionsOverrideAgentArgs: boolean
     title: string
+    extraAgentArgs?: string
     onAgentStatus: (status: JrAgentLifecycleState) => void
+    onData: (chunk: string) => void
     onExit: (code: number) => void
   }) => Promise<JrRecordAgentSessionInput | null>
   subscribeWorktreeProgress: (callback: (progress: JrWorktreeProgress) => void) => () => void
@@ -102,6 +105,7 @@ export function createJrCardExecutionLauncher(dependencies: JrExecutionLaunchDep
         await dependencies.recordWorktreeCreated(request.cardId, worktree, actor)
         await dependencies.seedTrellisSession(request.cardId, worktree.path, connectionId)
         const agent = jrHarnessAgent(request.harness)
+        const scanFailure = createJrHarnessPtyFailureScanner()
         const session = await dependencies.launchAgent({
           agent,
           worktreeId: worktree.id,
@@ -109,11 +113,22 @@ export function createJrCardExecutionLauncher(dependencies: JrExecutionLaunchDep
           sessionOptions: { model: request.model.id },
           sessionOptionsOverrideAgentArgs: true,
           title: `JR · ${request.title}`,
+          extraAgentArgs: agent === 'cursor' ? '--trust' : undefined,
           onAgentStatus: (status) =>
             reportJrLifecycle(
               dependencies.recordAgentStatus(request.cardId, status, actor),
               'agent status'
             ),
+          onData: (chunk) => {
+            const reason = scanFailure(chunk)
+            if (!reason) {
+              return
+            }
+            reportJrLifecycle(
+              dependencies.blockExecution(request.cardId, reason, actor),
+              'harness PTY failure'
+            )
+          },
           onExit: (code) =>
             reportJrLifecycle(
               code === 0
@@ -187,11 +202,13 @@ export async function launchJrCardExecution(
         branch: result.worktree.branch
       }
     },
-    launchAgent: async ({ onAgentStatus, onExit, ...request }) => {
+    launchAgent: async ({ onAgentStatus, onExit, onData, extraAgentArgs, ...request }) => {
       const session = await launchAgentBackgroundSession({
         ...request,
+        extraAgentArgs,
         launchSource: 'unknown',
         onAgentStatus: (status) => onAgentStatus(status.state),
+        onData,
         onExit: (_ptyId, code) => onExit(code)
       })
       return session

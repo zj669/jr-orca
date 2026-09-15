@@ -11,6 +11,7 @@ export type LaunchAgentBackgroundSessionArgs = {
   prompt?: string
   sessionOptions?: Record<string, SessionOptionValue>
   sessionOptionsOverrideAgentArgs?: boolean
+  extraAgentArgs?: string
   launchSource?: LaunchSource
   title?: string
   onData?: (chunk: string) => void

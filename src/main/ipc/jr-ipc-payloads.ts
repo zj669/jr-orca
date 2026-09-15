@@ -147,8 +147,8 @@ export function parseJrMergeIntoBaseInput(value: unknown): JrMergeIntoBaseInput 
   }
   return {
     baseWorktreePath: requireJrIpcString(value.baseWorktreePath, 'base worktree path'),
-    branch: requireJrIpcString(value.branch, 'feature branch'),
-    expectedBaseRef: requireJrIpcString(value.expectedBaseRef, 'base ref'),
+    branch: requireJrIpcString(value.branch ?? value.featureBranch, 'feature branch'),
+    expectedBaseRef: requireJrIpcString(value.expectedBaseRef ?? value.baseRef, 'base ref'),
     ...(connectionId ? { connectionId } : {})
   }
 }

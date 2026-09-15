@@ -80,6 +80,7 @@ describe('JR card execution launch', () => {
         prompt: 'DB-backed Trellis prompt',
         sessionOptions: { model: 'auto' },
         sessionOptionsOverrideAgentArgs: true,
+        extraAgentArgs: '--trust',
         title: 'JR · Launch JR task'
       })
     )
@@ -165,6 +166,33 @@ describe('JR card execution launch', () => {
       )
     })
     expect(requestReviewOnSuccess).not.toHaveBeenCalled()
+  })
+
+  it('blocks when PTY output reports a missing binary or auth failure while the shell stays open', async () => {
+    let reportData: (chunk: string) => void = () => {
+      throw new Error('The launcher did not subscribe to harness PTY data.')
+    }
+    const blockExecution = vi.fn().mockResolvedValue(undefined)
+    const launcher = createJrCardExecutionLauncher({
+      ...idleDependencies(),
+      launchAgent: vi.fn().mockImplementation(async (args: { onData: (chunk: string) => void }) => {
+        reportData = args.onData
+        return { agent: 'cursor', tabId: 'tab-1', paneKey: 'tab-1:pane-1', ptyId: 'pty-1' }
+      }),
+      blockExecution
+    })
+
+    await launcher.launch(request.cardId, controller)
+    reportData('Error: [permission_denied] This session token is scoped to Origin CLI usage')
+    reportData(' and is not permitted on this endpoint.\n$ ')
+    await vi.waitFor(() => {
+      expect(blockExecution).toHaveBeenCalledWith(
+        'card-1',
+        'Cursor Agent 认证失败：当前会话 token 不能调用 Cursor API。',
+        controller
+      )
+    })
+    expect(blockExecution).toHaveBeenCalledTimes(1)
   })
 
   it('persists a blocked card when native worktree creation fails', async () => {

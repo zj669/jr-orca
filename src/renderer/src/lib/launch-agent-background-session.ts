@@ -90,7 +90,12 @@ export async function launchAgentBackgroundSession(
     agent,
     prompt: hasPrompt && !isFollowupPath ? trimmedPrompt : '',
     cmdOverrides: store.settings?.agentCmdOverrides ?? {},
-    agentArgs: resolveTuiAgentLaunchArgs(agent, store.settings?.agentDefaultArgs),
+    agentArgs: [
+      resolveTuiAgentLaunchArgs(agent, store.settings?.agentDefaultArgs),
+      args.extraAgentArgs
+    ]
+      .filter((value): value is string => Boolean(value?.trim()))
+      .join(' '),
     agentEnv,
     sessionOptions: args.sessionOptions,
     sessionOptionsOverrideAgentArgs: args.sessionOptionsOverrideAgentArgs,

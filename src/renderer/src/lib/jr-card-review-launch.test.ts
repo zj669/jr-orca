@@ -166,6 +166,45 @@ describe('JR card review launch', () => {
     )
   })
 
+  it('strips refs/heads from the feature branch before local merge', async () => {
+    const mergeIntoBase = vi.fn().mockResolvedValue(undefined)
+    const launcher = createJrCardReviewLauncher({
+      ...idleDependencies(),
+      prepareShip: vi.fn().mockResolvedValue({
+        ...ship,
+        worktree: { ...ship.worktree, branch: 'refs/heads/jr/task' }
+      }),
+      findPullRequest: vi.fn().mockResolvedValue(null),
+      mergeIntoBase
+    })
+
+    await launcher.approveMerge('card-1', controller)
+
+    expect(mergeIntoBase).toHaveBeenCalledWith({
+      baseWorktreePath: '/repo',
+      branch: 'jr/task',
+      expectedBaseRef: 'main'
+    })
+  })
+
+  it('blocks the card when local merge fails after prepareShip', async () => {
+    const blockExecution = vi.fn().mockResolvedValue(undefined)
+    const launcher = createJrCardReviewLauncher({
+      ...idleDependencies(),
+      prepareShip: vi.fn().mockResolvedValue(ship),
+      findPullRequest: vi.fn().mockResolvedValue(null),
+      mergeIntoBase: vi.fn().mockRejectedValue(new Error('基础 worktree 当前在 HEAD，不是 main。')),
+      blockExecution
+    })
+
+    await expect(launcher.approveMerge('card-1', controller)).rejects.toThrow('不是 main')
+    expect(blockExecution).toHaveBeenCalledWith(
+      'card-1',
+      '基础 worktree 当前在 HEAD，不是 main。',
+      controller
+    )
+  })
+
   it('blocks the card when hosted merge fails', async () => {
     const blockExecution = vi.fn().mockResolvedValue(undefined)
     const launcher = createJrCardReviewLauncher({

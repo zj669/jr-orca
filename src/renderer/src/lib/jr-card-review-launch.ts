@@ -8,6 +8,7 @@ import type {
 } from '../../../shared/jr/jr-types'
 import {
   buildJrReviewSnapshot,
+  normalizeJrGitRef,
   type JrReviewCompareSnapshot,
   type JrReviewStatusSnapshot,
   type JrReviewWorktree
@@ -130,7 +131,7 @@ async function approveJrMerge(
   const pr = await deps.findPullRequest({
     repoPath: repo.path,
     repoId: ship.repositoryId,
-    branch: ship.worktree.branch,
+    branch: normalizeJrGitRef(ship.worktree.branch),
     linkedPR: worktree?.linkedPR ?? null
   })
   if (pr) {
@@ -199,8 +200,8 @@ async function mergeLocalBase(
   try {
     await deps.mergeIntoBase({
       baseWorktreePath: base.path,
-      branch: ship.worktree.branch,
-      expectedBaseRef: ship.baseRef,
+      branch: normalizeJrGitRef(ship.worktree.branch),
+      expectedBaseRef: normalizeJrGitRef(ship.baseRef),
       ...(connectionId ? { connectionId } : {})
     })
   } catch (error) {

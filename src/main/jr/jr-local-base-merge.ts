@@ -8,12 +8,20 @@ import type { JrMergeIntoBaseInput } from '../../shared/jr/jr-types'
 
 export async function mergeJrBranchIntoBase(input: JrMergeIntoBaseInput): Promise<void> {
   const baseWorktreePath = input.baseWorktreePath.trim()
-  const branch = input.branch.trim()
+  const branch = normalizeRef(input.branch)
   const expectedBaseRef = normalizeRef(input.expectedBaseRef)
   if (!baseWorktreePath || !branch || !expectedBaseRef) {
     throw new Error('JR 本地合并需要基础 worktree、功能分支和基础分支。')
   }
-  const current = normalizeRef(await gitText(['rev-parse', '--abbrev-ref', 'HEAD'], input))
+  let current = normalizeRef(await gitText(['rev-parse', '--abbrev-ref', 'HEAD'], input))
+  if (current !== expectedBaseRef) {
+    try {
+      await gitText(['checkout', '--quiet', expectedBaseRef], input)
+      current = normalizeRef(await gitText(['rev-parse', '--abbrev-ref', 'HEAD'], input))
+    } catch {
+      current = normalizeRef(await gitText(['rev-parse', '--abbrev-ref', 'HEAD'], input))
+    }
+  }
   if (current !== expectedBaseRef) {
     throw new Error(`基础 worktree 当前在 ${current}，不是 ${expectedBaseRef}。`)
   }
