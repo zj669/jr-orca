@@ -80,7 +80,8 @@ export function JrCardReviewActions({
             </Button>
           </>
         ) : null}
-        {card.status === 'pending_merge_approval' ? (
+        {card.status === 'pending_merge_approval' ||
+        (card.status === 'shipping' && !card.delivery) ? (
           <>
             <Button
               type="button"
@@ -89,7 +90,7 @@ export function JrCardReviewActions({
               disabled={saving}
             >
               {saving ? <Loader2 className="animate-spin" /> : <GitMerge />}
-              批准合并
+              {card.status === 'shipping' ? '重试合并' : '批准合并'}
             </Button>
             <Button
               type="button"
