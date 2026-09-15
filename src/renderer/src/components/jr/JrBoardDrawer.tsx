@@ -9,7 +9,13 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle
+} from '@/components/ui/sheet'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import type {
@@ -21,7 +27,7 @@ import type {
 
 const LOCAL_CONTROLLER: JrControllerActor = { kind: 'human-controller', id: 'local-user' }
 
-const LANES: ReadonlyArray<{ status: JrCardStatus; label: string; description: string }> = [
+const LANES: readonly { status: JrCardStatus; label: string; description: string }[] = [
   { status: 'idea', label: '想法', description: '尚未授权 AI 工作' },
   { status: 'discussion', label: '讨论中', description: '只读计划上下文' },
   { status: 'planning', label: '规划中', description: 'Trellis Plan' },
@@ -37,9 +43,7 @@ type JrBoardDrawerProps = {
   onOpenChange: (open: boolean) => void
 }
 
-function cardAction(
-  card: JrCard
-): {
+function cardAction(card: JrCard): {
   label: string
   transition: 'begin-discussion' | 'begin-planning' | 'request-execution-approval'
 } | null {
@@ -232,7 +236,9 @@ export default function JrBoardDrawer({
                         <div className="mb-3 flex items-start justify-between gap-2">
                           <div>
                             <h3 className="text-sm font-semibold">{lane.label}</h3>
-                            <p className="mt-0.5 text-xs text-muted-foreground">{lane.description}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {lane.description}
+                            </p>
                           </div>
                           <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                             {cards.length}
@@ -257,7 +263,9 @@ export default function JrBoardDrawer({
                             </button>
                           ))}
                           {cards.length === 0 ? (
-                            <p className="py-6 text-center text-xs text-muted-foreground">暂无卡片</p>
+                            <p className="py-6 text-center text-xs text-muted-foreground">
+                              暂无卡片
+                            </p>
                           ) : null}
                         </div>
                       </section>
@@ -311,7 +319,11 @@ export default function JrBoardDrawer({
                         <Select
                           value={selectedCard.model?.id ?? undefined}
                           onValueChange={handleModelChange}
-                          disabled={!selectedHarness || saving || selectedCard.status === 'pending_execution_approval'}
+                          disabled={
+                            !selectedHarness ||
+                            saving ||
+                            selectedCard.status === 'pending_execution_approval'
+                          }
                         >
                           <SelectTrigger id="jr-model" className="w-full">
                             <SelectValue placeholder="先选择 harness" />
@@ -325,7 +337,8 @@ export default function JrBoardDrawer({
                           </SelectContent>
                         </Select>
                         <p className="text-xs text-muted-foreground">
-                          Phase 1 复用 Orca 当前账号的默认模型；实时模型枚举将在 harness 接入时补上。
+                          Phase 1 复用 Orca 当前账号的默认模型；实时模型枚举将在 harness
+                          接入时补上。
                         </p>
                       </div>
                     </div>
@@ -350,7 +363,9 @@ export default function JrBoardDrawer({
                               )
                             )
                           }
-                          disabled={saving || (selectedCard.status === 'idea' && !selectedCard.model)}
+                          disabled={
+                            saving || (selectedCard.status === 'idea' && !selectedCard.model)
+                          }
                         >
                           {selectedCard.status === 'planning' ? <Sparkles /> : <ArrowRight />}
                           {selectedAction.label}

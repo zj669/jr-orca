@@ -5,96 +5,35 @@ import { dirname, join } from 'node:path'
 import SyncDatabase from '../sqlite/sync-database'
 import {
   isJrHarness,
-  JR_CARD_STATUSES,
   JR_HARNESS_CATALOG,
-  type JrArtifact,
   type JrBoardSnapshot,
   type JrCard,
   type JrCardStatus,
   type JrCardTransition,
   type JrControllerActor,
   type JrCreateCardInput,
-  type JrEvent,
   type JrModelChoice,
   type JrUpdateCardInput
 } from '../../shared/jr/jr-types'
-
-type DbRow = Record<string, unknown>
+import {
+  optionalJrDatabaseString,
+  requireJrDatabaseCardStatus,
+  requireJrDatabaseRow,
+  requireJrDatabaseString,
+  type JrDatabaseRow
+} from './jr-database-records'
+import {
+  requireJrAiConfiguration,
+  requireJrCardState,
+  requireJrController
+} from './jr-card-transition-guards'
+import { listJrCardArtifacts, listJrCardEvents } from './jr-card-history-reader'
+import { buildJrPlanningArtifacts, jrTaskArtifactPath } from './jr-trellis-artifact-templates'
 
 const CONFIGURABLE_STATUSES = new Set<JrCardStatus>(['idea', 'discussion', 'planning'])
 
-function isRecord(value: unknown): value is DbRow {
-  return value !== null && typeof value === 'object'
-}
-
-function requireRecord(value: unknown, message: string): DbRow {
-  if (!isRecord(value)) {
-    throw new Error(message)
-  }
-  return value
-}
-
-function requireString(row: DbRow, key: string): string {
-  const value = row[key]
-  if (typeof value !== 'string') {
-    throw new Error(`JR database field ${key} is invalid.`)
-  }
-  return value
-}
-
-function optionalString(row: DbRow, key: string): string | null {
-  const value = row[key]
-  return typeof value === 'string' ? value : null
-}
-
-function isJrCardStatus(value: string): value is JrCardStatus {
-  return JR_CARD_STATUSES.some((status) => status === value)
-}
-
-function requireCardStatus(row: DbRow): JrCardStatus {
-  const status = requireString(row, 'status')
-  if (!isJrCardStatus(status)) {
-    throw new Error(`JR database has an unknown status: ${status}.`)
-  }
-  return status
-}
-
 function now(): string {
   return new Date().toISOString()
-}
-
-function taskPath(cardId: string, artifact: string): string {
-  return `tasks/${cardId}/${artifact}`
-}
-
-function planningArtifacts(card: JrCard): ReadonlyArray<{ path: string; content: string }> {
-  const selectedModel = card.model?.label ?? '未选择'
-  const selectedHarness = card.harness ?? '未选择'
-  return [
-    {
-      path: 'workflow.md',
-      content:
-        '# JR Trellis workflow\n\nPlan → Execute → Finish is controlled by JR card state and controller approvals.\n'
-    },
-    {
-      path: 'spec/jr-controller.md',
-      content:
-        '# JR controller contract\n\nTask harness agents use JR tools for workflow/spec/task data and cannot self-authorize execution or merge.\n'
-    },
-    {
-      path: taskPath(card.id, 'prd.md'),
-      content: `# ${card.title}\n\n## Outcome\n${card.description}\n\n## Acceptance criteria\n- Define the user-visible outcome.\n- Keep work inside the approved task boundary.\n- Request review only after validation.\n`
-    },
-    {
-      path: taskPath(card.id, 'design.md'),
-      content: `# ${card.title} — design\n\nHarness: ${selectedHarness}\nModel: ${selectedModel}\n\nRecord contracts, risks, and rollback before execution approval.\n`
-    },
-    {
-      path: taskPath(card.id, 'implement.md'),
-      content:
-        '# Implementation checklist\n\n1. Read JR-backed PRD and specs.\n2. Implement only the approved scope.\n3. Run appropriate checks.\n4. Request review; do not merge.\n'
-    }
-  ]
 }
 
 export class JrStore {
@@ -149,7 +88,7 @@ export class JrStore {
       )
       .all()
     return {
-      cards: rows.map((row) => this.readCard(requireRecord(row, 'JR card row is invalid.'))),
+      cards: rows.map((row) => this.readCard(requireJrDatabaseRow(row, 'JR card row is invalid.'))),
       harnesses: JR_HARNESS_CATALOG
     }
   }
@@ -159,7 +98,7 @@ export class JrStore {
   }
 
   createCard(input: JrCreateCardInput, actor: JrControllerActor): JrCard {
-    this.requireController(actor)
+    requireJrController(actor)
     const title = input.title.trim()
     const description = input.description?.trim() || '补充问题、预期结果和验收标准。'
     if (title.length < 2 || title.length > 160) {
@@ -177,7 +116,7 @@ export class JrStore {
         ) VALUES (?, ?, ?, 'idea', NULL, NULL, NULL, ?, ?)`
       )
       .run(id, title, description, timestamp, timestamp)
-    this.upsertArtifact(id, taskPath(id, 'idea.md'), `# ${title}\n\n${description}\n`)
+    this.upsertArtifact(id, jrTaskArtifactPath(id, 'idea.md'), `# ${title}\n\n${description}\n`)
     this.recordEvent(id, '卡片已创建', '想法已记录，尚未授权 AI 讨论或执行。', actor)
     return this.getCard(id)
   }
@@ -187,7 +126,7 @@ export class JrStore {
     input: JrUpdateCardInput,
     actor: JrControllerActor
   ): JrCard {
-    this.requireController(actor)
+    requireJrController(actor)
     const card = this.getCard(cardId)
     if (!CONFIGURABLE_STATUSES.has(card.status)) {
       throw new Error('执行批准后不能修改 harness 或模型；请返回规划中后重试。')
@@ -212,31 +151,36 @@ export class JrStore {
   }
 
   transition(cardId: string, transition: JrCardTransition, actor: JrControllerActor): JrCard {
-    this.requireController(actor)
+    requireJrController(actor)
     const card = this.getCard(cardId)
     if (transition === 'begin-discussion') {
-      this.requireState(card, 'idea', '开始讨论')
-      this.requireAiConfiguration(card)
+      requireJrCardState(card, 'idea', '开始讨论')
+      requireJrAiConfiguration(card)
       this.setStatus(cardId, 'discussion')
       this.upsertArtifact(
         cardId,
-        taskPath(cardId, 'discussion.md'),
+        jrTaskArtifactPath(cardId, 'discussion.md'),
         `# Discussion\n\nHarness: ${card.harness}\nModel: ${card.model?.label}\n\nCapture decisions using JR-backed artifacts before planning.\n`
       )
-      this.recordEvent(cardId, '讨论已开始', '已绑定卡片的 harness 与模型；该阶段不授权代码写入。', actor)
+      this.recordEvent(
+        cardId,
+        '讨论已开始',
+        '已绑定卡片的 harness 与模型；该阶段不授权代码写入。',
+        actor
+      )
     } else if (transition === 'begin-planning') {
-      this.requireState(card, 'discussion', '进入规划')
-      this.requireAiConfiguration(card)
+      requireJrCardState(card, 'discussion', '进入规划')
+      requireJrAiConfiguration(card)
       this.setStatus(cardId, 'planning')
       const plannedCard = this.getCard(cardId)
-      for (const artifact of planningArtifacts(plannedCard)) {
+      for (const artifact of buildJrPlanningArtifacts(plannedCard)) {
         this.upsertArtifact(cardId, artifact.path, artifact.content)
       }
       this.recordEvent(cardId, '规划已开始', 'Trellis PRD、设计和实施计划已存入 JR 数据库。', actor)
     } else {
-      this.requireState(card, 'planning', '提交执行审批')
-      this.requireAiConfiguration(card)
-      this.requireArtifact(cardId, taskPath(cardId, 'prd.md'))
+      requireJrCardState(card, 'planning', '提交执行审批')
+      requireJrAiConfiguration(card)
+      this.requireArtifact(cardId, jrTaskArtifactPath(cardId, 'prd.md'))
       this.setStatus(cardId, 'pending_execution_approval')
       this.recordEvent(
         cardId,
@@ -272,69 +216,30 @@ export class JrStore {
     if (row === undefined) {
       throw new Error('未找到 JR 卡片。')
     }
-    return this.readCard(requireRecord(row, 'JR card row is invalid.'))
+    return this.readCard(requireJrDatabaseRow(row, 'JR card row is invalid.'))
   }
 
-  private readCard(row: DbRow): JrCard {
-    const id = requireString(row, 'id')
-    const harnessValue = optionalString(row, 'harness')
-    const modelId = optionalString(row, 'model_id')
-    const modelLabel = optionalString(row, 'model_label')
+  private readCard(row: JrDatabaseRow): JrCard {
+    const id = requireJrDatabaseString(row, 'id')
+    const harnessValue = optionalJrDatabaseString(row, 'harness')
+    const modelId = optionalJrDatabaseString(row, 'model_id')
+    const modelLabel = optionalJrDatabaseString(row, 'model_label')
     const model: JrModelChoice | null =
       modelId && modelLabel
         ? { id: modelId, label: modelLabel, capabilitySource: 'orca-default' }
         : null
     return {
       id,
-      title: requireString(row, 'title'),
-      description: requireString(row, 'description'),
-      status: requireCardStatus(row),
+      title: requireJrDatabaseString(row, 'title'),
+      description: requireJrDatabaseString(row, 'description'),
+      status: requireJrDatabaseCardStatus(row),
       harness: harnessValue && isJrHarness(harnessValue) ? harnessValue : null,
       model,
-      createdAt: requireString(row, 'created_at'),
-      updatedAt: requireString(row, 'updated_at'),
-      artifacts: this.listArtifacts(id),
-      events: this.listEvents(id)
+      createdAt: requireJrDatabaseString(row, 'created_at'),
+      updatedAt: requireJrDatabaseString(row, 'updated_at'),
+      artifacts: listJrCardArtifacts(this.db, id),
+      events: listJrCardEvents(this.db, id)
     }
-  }
-
-  private listArtifacts(cardId: string): JrArtifact[] {
-    const rows = this.db
-      .prepare(
-        `SELECT id, card_id, path, content, updated_at FROM jr_artifacts
-         WHERE card_id = ? ORDER BY path`
-      )
-      .all(cardId)
-    return rows.map((value) => {
-      const row = requireRecord(value, 'JR artifact row is invalid.')
-      return {
-        id: requireString(row, 'id'),
-        cardId: requireString(row, 'card_id'),
-        path: requireString(row, 'path'),
-        content: requireString(row, 'content'),
-        updatedAt: requireString(row, 'updated_at')
-      }
-    })
-  }
-
-  private listEvents(cardId: string): JrEvent[] {
-    const rows = this.db
-      .prepare(
-        `SELECT id, card_id, kind, detail, actor, created_at FROM jr_events
-         WHERE card_id = ? ORDER BY created_at DESC`
-      )
-      .all(cardId)
-    return rows.map((value) => {
-      const row = requireRecord(value, 'JR event row is invalid.')
-      return {
-        id: requireString(row, 'id'),
-        cardId: requireString(row, 'card_id'),
-        kind: requireString(row, 'kind'),
-        detail: requireString(row, 'detail'),
-        actor: requireString(row, 'actor'),
-        createdAt: requireString(row, 'created_at')
-      }
-    })
   }
 
   private upsertArtifact(cardId: string, path: string, content: string): void {
@@ -373,27 +278,6 @@ export class JrStore {
       .get(cardId, path)
     if (row === undefined) {
       throw new Error('PRD 尚未写入 JR 数据库。')
-    }
-  }
-
-  private requireController(actor: JrControllerActor): void {
-    if (
-      (actor.kind !== 'human-controller' && actor.kind !== 'master-controller') ||
-      actor.id.trim().length === 0
-    ) {
-      throw new Error('该操作需要具备 controller 能力的 actor。')
-    }
-  }
-
-  private requireAiConfiguration(card: JrCard): void {
-    if (!card.harness || !card.model) {
-      throw new Error('请先为卡片选择 Phase 1 harness 和模型。')
-    }
-  }
-
-  private requireState(card: JrCard, expected: JrCardStatus, action: string): void {
-    if (card.status !== expected) {
-      throw new Error(`卡片必须处于 ${expected} 才能${action}。`)
     }
   }
 }

@@ -22,7 +22,9 @@ afterEach(async () => {
     store.close()
   }
   await Promise.all(
-    temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true }))
+    temporaryDirectories
+      .splice(0)
+      .map((directory) => rm(directory, { recursive: true, force: true }))
   )
 })
 
@@ -57,11 +59,7 @@ describe('JrStore', () => {
       expect.arrayContaining(['workflow.md', 'spec/jr-controller.md', `tasks/${card.id}/prd.md`])
     )
 
-    const awaitingApproval = store.transition(
-      card.id,
-      'request-execution-approval',
-      controller
-    )
+    const awaitingApproval = store.transition(card.id, 'request-execution-approval', controller)
     expect(awaitingApproval.status).toBe('pending_execution_approval')
     expect(awaitingApproval.events[0]).toMatchObject({
       kind: '等待执行审批',

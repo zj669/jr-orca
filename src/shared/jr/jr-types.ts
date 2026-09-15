@@ -55,11 +55,11 @@ export type JrEvent = {
 
 export type JrBoardSnapshot = {
   cards: JrCard[]
-  harnesses: Array<{
+  harnesses: {
     id: JrHarness
     label: string
     models: JrModelChoice[]
-  }>
+  }[]
 }
 
 export type JrControllerActor = {
@@ -112,7 +112,5 @@ export function isJrHarness(value: unknown): value is JrHarness {
 }
 
 export function isJrCardTransition(value: unknown): value is JrCardTransition {
-  return (
-    typeof value === 'string' && JR_CARD_TRANSITIONS.some((transition) => transition === value)
-  )
+  return typeof value === 'string' && JR_CARD_TRANSITIONS.some((transition) => transition === value)
 }
