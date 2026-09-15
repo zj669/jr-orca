@@ -18,7 +18,7 @@ const request: JrExecutionLaunchRequest = {
   cardId: 'card-1',
   title: 'Launch JR task',
   harness: 'cursorcli',
-  model: { id: 'default', label: 'Orca 默认模型', capabilitySource: 'orca-default' },
+  model: { id: 'auto', label: 'Auto', capabilitySource: 'orca-session-catalog' },
   execution: { repositoryId: 'repo-1', baseRef: 'main', setupDecision: 'inherit' },
   prompt: 'DB-backed Trellis prompt'
 }
@@ -85,7 +85,9 @@ describe('JR card execution launch', () => {
   })
 
   it('records a nonzero harness exit as blocked through the lifecycle subscription', async () => {
-    let reportExit: ((code: number) => void) | null = null
+    let reportExit: (code: number) => void = () => {
+      throw new Error('The launcher did not subscribe to the harness exit lifecycle.')
+    }
     const blockExecution = vi.fn().mockResolvedValue(undefined)
     const launcher = createJrCardExecutionLauncher({
       prepareExecution: vi.fn().mockResolvedValue(request),
