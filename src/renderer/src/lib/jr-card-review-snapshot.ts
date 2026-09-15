@@ -1,4 +1,5 @@
 import type { GitBranchCompareResult } from '../../../shared/git-diff-compare-types'
+import type { GitStatusResult } from '../../../shared/git-status-types'
 import { isJrCompareStatus, type JrReviewSnapshot } from '../../../shared/jr/jr-types'
 
 export type JrReviewWorktree = {
@@ -9,10 +10,7 @@ export type JrReviewWorktree = {
   isMainWorktree: boolean
 }
 
-export type JrReviewStatusSnapshot = {
-  entries: { conflictStatus?: string }[]
-  conflictOperation: string
-}
+export type JrReviewStatusSnapshot = Pick<GitStatusResult, 'entries' | 'conflictOperation'>
 
 export type JrReviewCompareSnapshot = GitBranchCompareResult
 
