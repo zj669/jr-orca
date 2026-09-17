@@ -7,14 +7,17 @@ import type {
   JrCreateCardInput,
   JrDeliveryRecord,
   JrExecutionLaunchRequest,
+  JrExecutionRelaunchRequest,
   JrMergeIntoBaseInput,
   JrRecordAgentSessionInput,
   JrRecordWorktreeInput,
+  JrReviewLaunchRequest,
   JrReviewSnapshot,
   JrShipRequest,
   JrUpdateCardDetailsInput,
   JrUpdateCardInput,
-  JrUpdateExecutionTargetInput
+  JrUpdateExecutionTargetInput,
+  JrUpdateReviewConfigurationInput
 } from '../../shared/jr/jr-types'
 
 export type JrApi = {
@@ -23,6 +26,11 @@ export type JrApi = {
   updateCardConfiguration: (
     cardId: string,
     input: JrUpdateCardInput,
+    actor: JrControllerActor
+  ) => Promise<JrCard>
+  updateCardReviewConfiguration: (
+    cardId: string,
+    input: JrUpdateReviewConfigurationInput,
     actor: JrControllerActor
   ) => Promise<JrCard>
   updateCardExecutionTarget: (
@@ -43,6 +51,11 @@ export type JrApi = {
     actor: JrControllerActor
   ) => Promise<JrCard>
   prepareExecution: (cardId: string, actor: JrControllerActor) => Promise<JrExecutionLaunchRequest>
+  prepareExecutionRelaunch: (
+    cardId: string,
+    actor: JrControllerActor
+  ) => Promise<JrExecutionRelaunchRequest>
+  prepareReviewLaunch: (cardId: string, actor: JrControllerActor) => Promise<JrReviewLaunchRequest>
   recordWorktreeCreated: (
     cardId: string,
     input: JrRecordWorktreeInput,

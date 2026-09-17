@@ -5,6 +5,7 @@ import type {
   JrCard,
   JrControllerActor,
   JrExecutionLaunchRequest,
+  JrExecutionRelaunchRequest,
   JrRecordAgentSessionInput,
   JrRecordWorktreeInput,
   JrUpdateExecutionTargetInput
@@ -94,6 +95,27 @@ export class JrExecutionStore {
     }
   }
 
+  prepareRelaunch(card: JrCard): JrExecutionRelaunchRequest {
+    requireJrCardState(card, 'executing', '重新启动执行 AI')
+    requireJrAiConfiguration(card)
+    const worktree = card.execution.worktree
+    if (!worktree) {
+      throw new Error('JR 返工需要保留原有 Orca worktree。')
+    }
+    if (!card.harness || !card.model) {
+      throw new Error('JR 执行 AI 未配置。')
+    }
+    requireJrReviewFindings(card)
+    return {
+      cardId: card.id,
+      title: card.title,
+      harness: card.harness,
+      model: card.model,
+      worktree,
+      prompt: buildJrExecutionPrompt(card)
+    }
+  }
+
   recordWorktreeCreated(
     card: JrCard,
     input: JrRecordWorktreeInput,
@@ -133,7 +155,10 @@ export class JrExecutionStore {
     input: JrRecordAgentSessionInput,
     actor: JrControllerActor
   ): void {
-    requireJrCardState(card, 'creating_worktree', '启动 harness')
+    const relaunching = card.status === 'executing'
+    if (card.status !== 'creating_worktree' && !relaunching) {
+      throw new Error('JR 卡片必须处于创建工作树或执行中，才能启动执行 AI。')
+    }
     const expectedAgent = card.harness ? jrHarnessAgent(card.harness) : null
     if (!expectedAgent || input.agent !== expectedAgent) {
       throw new Error('JR harness 与 Orca agent launcher 不匹配。')
@@ -153,12 +178,16 @@ export class JrExecutionStore {
         jrNow(),
         card.id
       )
-    setJrCardStatus(this.db, card.id, 'executing')
+    if (!relaunching) {
+      setJrCardStatus(this.db, card.id, 'executing')
+    }
     recordJrEvent(
       this.db,
       card.id,
-      'Orca harness 已启动',
-      `${input.agent} 已在关联 worktree 中启动。`,
+      relaunching ? 'Orca 执行 AI 已重新启动' : 'Orca harness 已启动',
+      relaunching
+        ? `${input.agent} 已在原有 worktree 中重新启动，并携带审查结论。`
+        : `${input.agent} 已在关联 worktree 中启动。`,
       actor
     )
   }
@@ -248,5 +277,16 @@ function requireJrExecutionArtifact(card: JrCard, artifact: string): void {
   const path = jrTaskArtifactPath(card.id, artifact)
   if (!card.artifacts.some((candidate) => candidate.path === path)) {
     throw new Error(`JR 执行需要已保存的 ${artifact}。`)
+  }
+}
+
+function requireJrReviewFindings(card: JrCard): void {
+  const path = jrTaskArtifactPath(card.id, 'review.md')
+  if (
+    !card.artifacts.some(
+      (candidate) => candidate.path === path && candidate.content.trim().length > 0
+    )
+  ) {
+    throw new Error('JR 返工需要已保存的审查结论。')
   }
 }

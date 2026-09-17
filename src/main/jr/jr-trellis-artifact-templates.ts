@@ -52,6 +52,9 @@ export function buildJrExecutionPrompt(card: JrCard): string {
   const artifactContext = card.artifacts
     .map((artifact) => `### ${artifact.path}\n${artifact.content.trim()}`)
     .join('\n\n')
+  const reviewFindings = card.artifacts.find(
+    (artifact) => artifact.path === jrTaskArtifactPath(card.id, 'review.md')
+  )
   return `You are executing JR card ${card.id}.
 
 ## Approved task
@@ -62,6 +65,28 @@ Model: ${card.model?.label ?? 'unconfigured'}
 ${card.description}
 
 Use the approved scope and acceptance criteria below. JR's SQLite database is canonical for Trellis data: this prompt is a launch-time projection. Read and write workflow/spec/task artifacts through the jr-trellis MCP tools (\`jr_artifact_upsert\`, \`jr_task_update\`, \`jr_journal_append\`). Follow skills \`jr-trellis-plan\`, \`jr-trellis-implement\`, \`jr-trellis-check\`, and \`jr-trellis-finish\`. Do not treat .trellis files as a writable source of truth. Work only in this Orca worktree, run appropriate checks, and request review with \`jr_card_request_transition\` / \`request-review\` when ready. You cannot promote this card to 待批准执行, 创建工作树, 交付中, or 已合并. Do not merge. Call \`jr_projection_verify\` before finish; mismatched hashes mean stop.
+
+${reviewFindings ? `## Review findings to address\n${reviewFindings.content.trim()}\n` : ''}
+
+## JR-backed Trellis artifacts
+${artifactContext}
+`
+}
+
+export function buildJrReviewPrompt(card: JrCard): string {
+  const artifactContext = card.artifacts
+    .map((artifact) => `### ${artifact.path}\n${artifact.content.trim()}`)
+    .join('\n\n')
+  return `You are reviewing JR card ${card.id}.
+
+## Review target
+Title: ${card.title}
+Review harness: ${card.reviewHarness ?? 'unconfigured'}
+Review model: ${card.reviewModel?.label ?? 'unconfigured'}
+
+Use \`jr-trellis-check\` and JR SQLite-backed MCP tools to inspect the approved artifacts, current worktree diff, and acceptance criteria. Persist concrete findings in \`tasks/${card.id}/review.md\` with \`jr_artifact_upsert\`, then append a review journal entry with \`jr_journal_append\`.
+
+Do not edit application source, create a worktree, approve execution, request merge, or merge. The controller decides whether to return work to execution, pass verification, or approve delivery.
 
 ## JR-backed Trellis artifacts
 ${artifactContext}

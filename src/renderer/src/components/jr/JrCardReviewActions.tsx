@@ -1,6 +1,7 @@
 import React from 'react'
 import { ArrowLeft, Check, GitMerge, Loader2, ScanSearch } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { relaunchJrCardExecution } from '@/lib/jr-card-execution-relaunch'
 import { approveJrCardMerge, launchJrCardReview } from '@/lib/jr-card-review-desktop'
 import type { JrCard, JrControllerActor } from '../../../../shared/jr/jr-types'
 
@@ -17,6 +18,7 @@ export function JrCardReviewActions({
   controller,
   runAction
 }: JrCardReviewActionsProps): React.JSX.Element | null {
+  const reviewConfigured = Boolean(card.reviewHarness && card.reviewModel)
   if (
     card.status !== 'executing' &&
     card.status !== 'verifying' &&
@@ -45,16 +47,21 @@ export function JrCardReviewActions({
               : `已在基础 worktree 合并到 ${card.delivery.mergedInto}`}
         </p>
       ) : null}
+      {card.status === 'executing' && !reviewConfigured ? (
+        <p className="text-xs text-muted-foreground">
+          请求验证前，请选择审查 AI，或明确选择“与执行相同”。
+        </p>
+      ) : null}
       <div className="flex flex-wrap gap-2">
         {card.status === 'executing' ? (
           <Button
             type="button"
             size="sm"
             onClick={() => runAction(() => launchJrCardReview(card.id, controller))}
-            disabled={saving}
+            disabled={saving || !reviewConfigured}
           >
             {saving ? <Loader2 className="animate-spin" /> : <ScanSearch />}
-            请求验证并打开 diff
+            请求验证并启动审查
           </Button>
         ) : null}
         {card.status === 'verifying' ? (
@@ -72,7 +79,7 @@ export function JrCardReviewActions({
               type="button"
               size="sm"
               variant="outline"
-              onClick={() => runAction(() => window.api.jr.returnToExecution(card.id, controller))}
+              onClick={() => runAction(() => relaunchJrCardExecution(card.id, controller))}
               disabled={saving}
             >
               <ArrowLeft />
@@ -96,7 +103,7 @@ export function JrCardReviewActions({
               type="button"
               size="sm"
               variant="outline"
-              onClick={() => runAction(() => window.api.jr.returnToExecution(card.id, controller))}
+              onClick={() => runAction(() => relaunchJrCardExecution(card.id, controller))}
               disabled={saving}
             >
               <ArrowLeft />

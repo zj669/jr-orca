@@ -1,4 +1,5 @@
 import React from 'react'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -25,6 +26,9 @@ type JrCardSetupFieldsProps = {
   saving: boolean
   onHarnessChange: (harness: string) => void
   onModelChange: (modelId: string) => void
+  onReviewHarnessChange: (harness: string) => void
+  onReviewModelChange: (modelId: string) => void
+  onUseExecutionForReview: () => void
   onRepositoryChange: (repositoryId: string) => void
   onBaseRefBlur: (event: React.FocusEvent<HTMLInputElement>) => void
   onSetupPolicyChange: (setupDecision: string) => void
@@ -39,16 +43,22 @@ export function JrCardSetupFields({
   saving,
   onHarnessChange,
   onModelChange,
+  onReviewHarnessChange,
+  onReviewModelChange,
+  onUseExecutionForReview,
   onRepositoryChange,
   onBaseRefBlur,
   onSetupPolicyChange,
   onDetailsBlur,
   onPriorityChange
 }: JrCardSetupFieldsProps): React.JSX.Element {
-  const selectedHarness = harnesses.find((harness) => harness.id === card.harness) ?? null
+  const selectedExecutionHarness = harnesses.find((harness) => harness.id === card.harness) ?? null
+  const selectedReviewHarness =
+    harnesses.find((harness) => harness.id === card.reviewHarness) ?? null
   const selectedRepository =
     repositories.find((repository) => repository.id === card.execution.repositoryId) ?? null
-  const locked = saving || !isConfigurable(card)
+  const executionLocked = saving || !isExecutionConfigurable(card)
+  const reviewLocked = saving || !isReviewConfigurable(card)
 
   return (
     <>
@@ -62,7 +72,7 @@ export function JrCardSetupFields({
             id="jr-description"
             defaultValue={card.description}
             placeholder="写明问题、预期结果，以及为什么现在做。"
-            disabled={locked}
+            disabled={executionLocked}
             className="min-h-20"
             onBlur={(event) => onDetailsBlur('description', event.target.value)}
           />
@@ -76,7 +86,7 @@ export function JrCardSetupFields({
             id="jr-acceptance"
             defaultValue={card.acceptance}
             placeholder="可验证的完成条件。"
-            disabled={locked}
+            disabled={executionLocked}
             className="min-h-20"
             onBlur={(event) => onDetailsBlur('acceptance', event.target.value)}
           />
@@ -95,7 +105,7 @@ export function JrCardSetupFields({
                 onPriorityChange(value)
               }
             }}
-            disabled={locked}
+            disabled={executionLocked}
           >
             <SelectTrigger id="jr-priority" className="w-full">
               <SelectValue placeholder="选择 p0–p3" />
@@ -109,16 +119,23 @@ export function JrCardSetupFields({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="jr-harness" className="text-xs">
-            Harness
+      </div>
+
+      <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="jr-execution-harness" className="text-xs">
+            执行 AI
           </Label>
           <Select
             value={card.harness ?? undefined}
             onValueChange={onHarnessChange}
-            disabled={locked}
+            disabled={executionLocked}
           >
-            <SelectTrigger id="jr-harness" className="w-full">
+            <SelectTrigger
+              id="jr-execution-harness"
+              className="w-full"
+              aria-label="执行 AI harness"
+            >
               <SelectValue placeholder="选择 Phase 1 harness" />
             </SelectTrigger>
             <SelectContent>
@@ -129,21 +146,65 @@ export function JrCardSetupFields({
               ))}
             </SelectContent>
           </Select>
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="jr-model" className="text-xs">
-            模型
-          </Label>
           <Select
             value={card.model?.id ?? undefined}
             onValueChange={onModelChange}
-            disabled={!selectedHarness || locked}
+            disabled={!selectedExecutionHarness || executionLocked}
           >
-            <SelectTrigger id="jr-model" className="w-full">
-              <SelectValue placeholder="先选择 harness" />
+            <SelectTrigger id="jr-execution-model" className="w-full" aria-label="执行 AI 模型">
+              <SelectValue placeholder="先选择执行 AI" />
             </SelectTrigger>
             <SelectContent>
-              {selectedHarness?.models.map((model) => (
+              {selectedExecutionHarness?.models.map((model) => (
+                <SelectItem key={model.id} value={model.id}>
+                  {model.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="jr-review-harness" className="text-xs">
+              审查 AI
+            </Label>
+            <Button
+              type="button"
+              variant="link"
+              size="xs"
+              className="h-auto px-0"
+              onClick={onUseExecutionForReview}
+              disabled={reviewLocked || !card.harness || !card.model}
+            >
+              与执行相同
+            </Button>
+          </div>
+          <Select
+            value={card.reviewHarness ?? undefined}
+            onValueChange={onReviewHarnessChange}
+            disabled={reviewLocked}
+          >
+            <SelectTrigger id="jr-review-harness" className="w-full" aria-label="审查 AI harness">
+              <SelectValue placeholder="选择审查 harness" />
+            </SelectTrigger>
+            <SelectContent>
+              {harnesses.map((harness) => (
+                <SelectItem key={harness.id} value={harness.id}>
+                  {harness.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={card.reviewModel?.id ?? undefined}
+            onValueChange={onReviewModelChange}
+            disabled={!selectedReviewHarness || reviewLocked}
+          >
+            <SelectTrigger id="jr-review-model" className="w-full" aria-label="审查 AI 模型">
+              <SelectValue placeholder="先选择审查 AI" />
+            </SelectTrigger>
+            <SelectContent>
+              {selectedReviewHarness?.models.map((model) => (
                 <SelectItem key={model.id} value={model.id}>
                   {model.label}
                 </SelectItem>
@@ -153,7 +214,7 @@ export function JrCardSetupFields({
         </div>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        讨论中与规划中使用同一 harness 和模型。变更会作废已冻结的规划工件。执行批准后不可修改。
+        执行 AI 在批准后锁定。审查 AI 可在完成前调整；请求验证前必须明确选择。
       </p>
 
       <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-3">
@@ -162,7 +223,7 @@ export function JrCardSetupFields({
           <Select
             value={card.execution.repositoryId ?? undefined}
             onValueChange={onRepositoryChange}
-            disabled={locked}
+            disabled={executionLocked}
           >
             <SelectTrigger id="jr-repository" className="w-full">
               <SelectValue placeholder="选择 Orca 仓库或文件夹" />
@@ -184,7 +245,7 @@ export function JrCardSetupFields({
             id="jr-base-ref"
             defaultValue={card.execution.baseRef ?? ''}
             placeholder="main"
-            disabled={locked || !card.execution.repositoryId}
+            disabled={executionLocked || !card.execution.repositoryId}
             onBlur={onBaseRefBlur}
           />
         </div>
@@ -193,7 +254,7 @@ export function JrCardSetupFields({
           <Select
             value={card.execution.setupDecision}
             onValueChange={onSetupPolicyChange}
-            disabled={locked || !card.execution.repositoryId}
+            disabled={executionLocked || !card.execution.repositoryId}
           >
             <SelectTrigger id="jr-setup-policy" className="w-full">
               <SelectValue />
@@ -220,8 +281,12 @@ export function JrCardSetupFields({
   )
 }
 
-function isConfigurable(card: JrCard): boolean {
+function isExecutionConfigurable(card: JrCard): boolean {
   return card.status === 'idea' || card.status === 'discussion' || card.status === 'planning'
+}
+
+function isReviewConfigurable(card: JrCard): boolean {
+  return card.status !== 'merged' && card.status !== 'cancelled'
 }
 
 function isPriority(value: string): value is JrCardPriority {

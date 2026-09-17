@@ -64,7 +64,7 @@ describe('JR IPC', () => {
     const store = await createStore()
     registerJrHandlers(store)
 
-    expect(ipcHandleMock).toHaveBeenCalledTimes(22)
+    expect(ipcHandleMock).toHaveBeenCalledTimes(25)
 
     await invoke(
       'jr:createCard',
@@ -82,6 +82,13 @@ describe('JR IPC', () => {
       undefined,
       card.id,
       { harness: 'claude', modelId: 'sonnet' },
+      { kind: 'human-controller', id: 'walker' }
+    )
+    await invoke(
+      'jr:updateCardReviewConfiguration',
+      undefined,
+      card.id,
+      { harness: 'codex', modelId: 'gpt-5.6-sol' },
       { kind: 'human-controller', id: 'walker' }
     )
     await invoke('jr:transitionCard', undefined, card.id, 'begin-discussion', {
@@ -128,7 +135,9 @@ describe('JR IPC', () => {
     expect(persisted).toMatchObject({
       status: 'pending_execution_approval',
       harness: 'claude',
-      model: { id: 'sonnet' }
+      model: { id: 'sonnet' },
+      reviewHarness: 'codex',
+      reviewModel: { id: 'gpt-5.6-sol' }
     })
     expect(persisted?.artifacts.map((artifact) => artifact.path)).toEqual(
       expect.arrayContaining([

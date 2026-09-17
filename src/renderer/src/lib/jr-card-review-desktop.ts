@@ -3,11 +3,14 @@ import { useAppStore } from '@/store'
 import { getIndexedAllWorktrees, getIndexedWorktreeById } from '@/store/worktree-repo-index'
 import type { JrControllerActor } from '../../../shared/jr/jr-types'
 import type { Worktree } from '../../../shared/worktree/types'
+import { launchJrCardReviewAgent } from './jr-card-review-agent-launch'
 import { createJrCardReviewLauncher, type JrReviewLaunchDeps } from './jr-card-review-launch'
 import { findJrBaseWorktree, type JrReviewWorktree } from './jr-card-review-snapshot'
 
 export async function launchJrCardReview(cardId: string, actor: JrControllerActor): Promise<void> {
+  const request = await window.api.jr.prepareReviewLaunch(cardId, actor)
   await createDesktopJrCardReviewLauncher().requestReview(cardId, actor)
+  await launchJrCardReviewAgent(request, actor)
 }
 
 export async function approveJrCardMerge(cardId: string, actor: JrControllerActor): Promise<void> {

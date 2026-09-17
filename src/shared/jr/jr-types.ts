@@ -107,6 +107,15 @@ export type JrShipRequest = {
   review: JrReviewSnapshot
 }
 
+export type JrReviewLaunchRequest = {
+  cardId: string
+  title: string
+  harness: JrHarness
+  model: JrModelChoice
+  worktree: JrWorktreeReference
+  prompt: string
+}
+
 export type JrMergeIntoBaseInput = {
   baseWorktreePath: string
   branch: string
@@ -123,6 +132,8 @@ export type JrCard = {
   status: JrCardStatus
   harness: JrHarness | null
   model: JrModelChoice | null
+  reviewHarness?: JrHarness | null
+  reviewModel?: JrModelChoice | null
   execution: JrExecutionState
   review: JrReviewSnapshot | null
   delivery: JrDeliveryRecord | null
@@ -183,6 +194,8 @@ export type JrUpdateCardInput = {
   modelId: string
 }
 
+export type JrUpdateReviewConfigurationInput = JrUpdateCardInput
+
 export type JrUpdateExecutionTargetInput = {
   repositoryId: string
   baseRef: string
@@ -199,6 +212,15 @@ export type JrExecutionLaunchRequest = {
     baseRef: string
     setupDecision: JrExecutionTarget['setupDecision']
   }
+  prompt: string
+}
+
+export type JrExecutionRelaunchRequest = {
+  cardId: string
+  title: string
+  harness: JrHarness
+  model: JrModelChoice
+  worktree: JrWorktreeReference
   prompt: string
 }
 

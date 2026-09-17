@@ -24,9 +24,12 @@ type JrHandlerStore = Pick<
   | 'listBoard'
   | 'createCard'
   | 'updateCardConfiguration'
+  | 'updateCardReviewConfiguration'
   | 'updateCardExecutionTarget'
   | 'transition'
   | 'prepareExecution'
+  | 'prepareExecutionRelaunch'
+  | 'prepareReviewLaunch'
   | 'recordWorktreeCreated'
   | 'recordWorktreeProgress'
   | 'readCard'
@@ -60,6 +63,15 @@ export function registerJrHandlers(store: JrHandlerStore = getJrStore()): void {
       )
   )
   ipcMain.handle(
+    'jr:updateCardReviewConfiguration',
+    (_event, cardId: unknown, rawInput: unknown, rawActor: unknown) =>
+      store.updateCardReviewConfiguration(
+        requireJrIpcString(cardId, 'card id'),
+        parseJrConfigurationInput(rawInput),
+        parseJrControllerActor(rawActor)
+      )
+  )
+  ipcMain.handle(
     'jr:updateCardExecutionTarget',
     (_event, cardId: unknown, rawInput: unknown, rawActor: unknown) =>
       store.updateCardExecutionTarget(
@@ -79,6 +91,18 @@ export function registerJrHandlers(store: JrHandlerStore = getJrStore()): void {
   )
   ipcMain.handle('jr:prepareExecution', (_event, cardId: unknown, rawActor: unknown) =>
     store.prepareExecution(requireJrIpcString(cardId, 'card id'), parseJrControllerActor(rawActor))
+  )
+  ipcMain.handle('jr:prepareExecutionRelaunch', (_event, cardId: unknown, rawActor: unknown) =>
+    store.prepareExecutionRelaunch(
+      requireJrIpcString(cardId, 'card id'),
+      parseJrControllerActor(rawActor)
+    )
+  )
+  ipcMain.handle('jr:prepareReviewLaunch', (_event, cardId: unknown, rawActor: unknown) =>
+    store.prepareReviewLaunch(
+      requireJrIpcString(cardId, 'card id'),
+      parseJrControllerActor(rawActor)
+    )
   )
   ipcMain.handle(
     'jr:recordWorktreeCreated',

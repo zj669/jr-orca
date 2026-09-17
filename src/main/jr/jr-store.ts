@@ -8,14 +8,17 @@ import {
   type JrControllerActor,
   type JrCreateCardInput,
   type JrExecutionLaunchRequest,
+  type JrExecutionRelaunchRequest,
   type JrRecordAgentSessionInput,
   type JrDeliveryRecord,
   type JrRecordWorktreeInput,
+  type JrReviewLaunchRequest,
   type JrReviewSnapshot,
   type JrShipRequest,
   type JrUpdateCardDetailsInput,
   type JrUpdateCardInput,
   type JrUpdateExecutionTargetInput,
+  type JrUpdateReviewConfigurationInput,
   type JrAgentLifecycleState
 } from '../../shared/jr/jr-types'
 import { requireJrActor, requireJrController } from './jr-card-transition-guards'
@@ -87,11 +90,7 @@ export class JrStore {
     if (!isJrHarness(input.harness)) {
       throw new Error('选择的 harness 不在 Phase 1 范围内。')
     }
-    const harness = JR_HARNESS_CATALOG.find((item) => item.id === input.harness)
-    const model = harness?.models.find((item) => item.id === input.modelId)
-    if (!harness || !model) {
-      throw new Error('该模型不受当前 harness 支持。')
-    }
+    const { harness, model } = resolveJrHarnessModel(input)
     this.db
       .prepare(
         `UPDATE jr_cards
@@ -102,6 +101,28 @@ export class JrStore {
     recordJrEvent(this.db, cardId, 'AI 配置已更新', `${harness.label} · ${model.label}`, actor)
     const updated = this.readCard(cardId)
     this.lifecycle.invalidatePlanIfNeeded(card, updated, actor)
+    return this.readCard(cardId)
+  }
+
+  updateCardReviewConfiguration(
+    cardId: string,
+    input: JrUpdateReviewConfigurationInput,
+    actor: JrControllerActor
+  ): JrCard {
+    requireJrController(actor)
+    const card = this.readCard(cardId)
+    if (card.status === 'merged' || card.status === 'cancelled') {
+      throw new Error('卡片完成后不能修改审查 AI。')
+    }
+    const { harness, model } = resolveJrHarnessModel(input)
+    this.db
+      .prepare(
+        `UPDATE jr_cards
+         SET review_harness = ?, review_model_id = ?, review_model_label = ?, updated_at = ?
+         WHERE id = ?`
+      )
+      .run(harness.id, model.id, model.label, jrNow(), cardId)
+    recordJrEvent(this.db, cardId, '审查 AI 配置已更新', `${harness.label} · ${model.label}`, actor)
     return this.readCard(cardId)
   }
 
@@ -123,6 +144,16 @@ export class JrStore {
   prepareExecution(cardId: string, actor: JrControllerActor): JrExecutionLaunchRequest {
     requireJrController(actor)
     return this.execution.prepareLaunch(this.readCard(cardId), actor)
+  }
+
+  prepareExecutionRelaunch(cardId: string, actor: JrControllerActor): JrExecutionRelaunchRequest {
+    requireJrController(actor)
+    return this.execution.prepareRelaunch(this.readCard(cardId))
+  }
+
+  prepareReviewLaunch(cardId: string, actor: JrControllerActor): JrReviewLaunchRequest {
+    requireJrController(actor)
+    return this.review.prepareLaunch(this.readCard(cardId))
   }
 
   recordWorktreeCreated(
@@ -272,4 +303,19 @@ export class JrStore {
       { kind: 'human-controller', id: 'local-user' }
     )
   }
+}
+
+function resolveJrHarnessModel(input: JrUpdateCardInput): {
+  harness: (typeof JR_HARNESS_CATALOG)[number]
+  model: (typeof JR_HARNESS_CATALOG)[number]['models'][number]
+} {
+  if (!isJrHarness(input.harness)) {
+    throw new Error('选择的 harness 不在 Phase 1 范围内。')
+  }
+  const harness = JR_HARNESS_CATALOG.find((item) => item.id === input.harness)
+  const model = harness?.models.find((item) => item.id === input.modelId)
+  if (!harness || !model) {
+    throw new Error('该模型不受当前 harness 支持。')
+  }
+  return { harness, model }
 }

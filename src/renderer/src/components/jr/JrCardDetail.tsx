@@ -78,6 +78,41 @@ export function JrCardDetail({
       window.api.jr.updateCardConfiguration(card.id, { harness, modelId }, controller)
     )
   }
+  const handleReviewHarnessChange = (harness: string): void => {
+    const option = harnesses.find((item) => item.id === harness)
+    const defaultModel = option?.models[0]
+    if (!option || !defaultModel) {
+      return
+    }
+    runAction(() =>
+      window.api.jr.updateCardReviewConfiguration(
+        card.id,
+        { harness: option.id, modelId: defaultModel.id },
+        controller
+      )
+    )
+  }
+  const handleReviewModelChange = (modelId: string): void => {
+    const harness = card.reviewHarness
+    if (!harness) {
+      return
+    }
+    runAction(() =>
+      window.api.jr.updateCardReviewConfiguration(card.id, { harness, modelId }, controller)
+    )
+  }
+  const handleUseExecutionForReview = (): void => {
+    if (!card.harness || !card.model) {
+      return
+    }
+    runAction(() =>
+      window.api.jr.updateCardReviewConfiguration(
+        card.id,
+        { harness: card.harness, modelId: card.model.id },
+        controller
+      )
+    )
+  }
   const handleRepositoryChange = (repositoryId: string): void => {
     const repository = repositories.find((item) => item.id === repositoryId)
     if (!repository) {
@@ -200,6 +235,9 @@ export function JrCardDetail({
         saving={saving}
         onHarnessChange={handleHarnessChange}
         onModelChange={handleModelChange}
+        onReviewHarnessChange={handleReviewHarnessChange}
+        onReviewModelChange={handleReviewModelChange}
+        onUseExecutionForReview={handleUseExecutionForReview}
         onRepositoryChange={handleRepositoryChange}
         onBaseRefBlur={handleBaseRefBlur}
         onSetupPolicyChange={handleSetupPolicyChange}
@@ -212,8 +250,12 @@ export function JrCardDetail({
           <Bot className="size-3.5 shrink-0" />
           <span className="min-w-0 break-keep">
             {card.harness && card.model
-              ? `${card.harness} · ${card.model.label}`
-              : '选择配置后才能创建讨论上下文'}
+              ? `执行 ${card.harness} · ${card.model.label} · 审查 ${
+                  card.reviewHarness && card.reviewModel
+                    ? `${card.reviewHarness} · ${card.reviewModel.label}`
+                    : '未选择'
+                }`
+              : '选择执行 AI 后才能创建讨论上下文'}
           </span>
         </div>
         {action ? (

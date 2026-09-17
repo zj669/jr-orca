@@ -18,6 +18,9 @@ export function openJrSqlite(databasePath: string): SyncDatabase {
         harness TEXT,
         model_id TEXT,
         model_label TEXT,
+        review_harness TEXT,
+        review_model_id TEXT,
+        review_model_label TEXT,
         repository_id TEXT,
         base_ref TEXT,
         setup_decision TEXT NOT NULL DEFAULT 'inherit',
@@ -94,7 +97,10 @@ const CARD_CONTRACT_COLUMNS = [
   { name: 'priority', definition: 'TEXT' },
   { name: 'blocked_from_status', definition: 'TEXT' },
   { name: 'blocked_reason', definition: 'TEXT' },
-  { name: 'blocked_owner', definition: 'TEXT' }
+  { name: 'blocked_owner', definition: 'TEXT' },
+  { name: 'review_harness', definition: 'TEXT' },
+  { name: 'review_model_id', definition: 'TEXT' },
+  { name: 'review_model_label', definition: 'TEXT' }
 ] as const
 
 export function ensureJrCardContractSchema(db: SyncDatabase): void {

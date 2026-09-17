@@ -6,6 +6,8 @@ export const jrApi = {
   createCard: (input, actor) => ipcRenderer.invoke('jr:createCard', input, actor),
   updateCardConfiguration: (cardId, input, actor) =>
     ipcRenderer.invoke('jr:updateCardConfiguration', cardId, input, actor),
+  updateCardReviewConfiguration: (cardId, input, actor) =>
+    ipcRenderer.invoke('jr:updateCardReviewConfiguration', cardId, input, actor),
   updateCardExecutionTarget: (cardId, input, actor) =>
     ipcRenderer.invoke('jr:updateCardExecutionTarget', cardId, input, actor),
   updateCardDetails: (cardId, input, actor) =>
@@ -16,6 +18,10 @@ export const jrApi = {
   transitionCard: (cardId, transition, actor) =>
     ipcRenderer.invoke('jr:transitionCard', cardId, transition, actor),
   prepareExecution: (cardId, actor) => ipcRenderer.invoke('jr:prepareExecution', cardId, actor),
+  prepareExecutionRelaunch: (cardId, actor) =>
+    ipcRenderer.invoke('jr:prepareExecutionRelaunch', cardId, actor),
+  prepareReviewLaunch: (cardId, actor) =>
+    ipcRenderer.invoke('jr:prepareReviewLaunch', cardId, actor),
   recordWorktreeCreated: (cardId, input, actor) =>
     ipcRenderer.invoke('jr:recordWorktreeCreated', cardId, input, actor),
   seedTrellisSession: (cardId, worktreePath, connectionId) =>

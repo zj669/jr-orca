@@ -3,11 +3,12 @@ import type {
   JrCard,
   JrControllerActor,
   JrDeliveryRecord,
+  JrReviewLaunchRequest,
   JrReviewSnapshot,
   JrShipRequest
 } from '../../shared/jr/jr-types'
 import { requireJrCardState } from './jr-card-transition-guards'
-import { jrTaskArtifactPath } from './jr-trellis-artifact-templates'
+import { buildJrReviewPrompt, jrTaskArtifactPath } from './jr-trellis-artifact-templates'
 import { jrNow, recordJrEvent, setJrCardStatus, upsertJrArtifact } from './jr-card-records'
 import { persistJrBlocked } from './jr-blocked-state'
 import { optionalJrDatabaseString, requireJrDatabaseRow } from './jr-database-records'
@@ -46,6 +47,25 @@ export class JrReviewStore {
       `${snapshot.changedFiles} 个文件 · ahead ${snapshot.commitsAhead} · uncommitted ${snapshot.uncommittedFiles}`,
       actor
     )
+  }
+
+  prepareLaunch(card: JrCard): JrReviewLaunchRequest {
+    requireJrCardState(card, 'executing', '启动审查 AI')
+    const worktree = card.execution.worktree
+    if (!worktree) {
+      throw new Error('JR 审查需要已创建的 Orca worktree。')
+    }
+    if (!card.reviewHarness || !card.reviewModel) {
+      throw new Error('请先选择审查 AI，或明确使用与执行相同的配置。')
+    }
+    return {
+      cardId: card.id,
+      title: card.title,
+      harness: card.reviewHarness,
+      model: card.reviewModel,
+      worktree,
+      prompt: buildJrReviewPrompt(card)
+    }
   }
 
   passVerification(card: JrCard, actor: JrControllerActor): void {

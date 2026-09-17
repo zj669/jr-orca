@@ -26,6 +26,7 @@ export function jrNow(): string {
 }
 
 export const JR_CARD_SELECT_COLUMNS = `id, title, description, acceptance, priority, status, harness, model_id, model_label,
+                review_harness, review_model_id, review_model_label,
                 repository_id, base_ref, setup_decision, worktree_id, worktree_path, worktree_branch,
                 worktree_phase, agent_type, agent_tab_id, agent_pane_key, agent_pty_id, agent_status,
                 review_json, delivery_json, blocked_from_status, blocked_reason, blocked_owner,
@@ -48,10 +49,11 @@ export function readJrCard(db: SyncDatabase, row: JrDatabaseRow): JrCard {
   const harnessValue = optionalJrDatabaseString(row, 'harness')
   const modelId = optionalJrDatabaseString(row, 'model_id')
   const modelLabel = optionalJrDatabaseString(row, 'model_label')
-  const model: JrModelChoice | null =
-    modelId && modelLabel
-      ? { id: modelId, label: modelLabel, capabilitySource: 'orca-session-catalog' }
-      : null
+  const reviewHarnessValue = optionalJrDatabaseString(row, 'review_harness')
+  const reviewModelId = optionalJrDatabaseString(row, 'review_model_id')
+  const reviewModelLabel = optionalJrDatabaseString(row, 'review_model_label')
+  const model = readJrModelChoice(modelId, modelLabel)
+  const reviewModel = readJrModelChoice(reviewModelId, reviewModelLabel)
   const worktreeId = optionalJrDatabaseString(row, 'worktree_id')
   const worktreePath = optionalJrDatabaseString(row, 'worktree_path')
   const worktreeBranch = optionalJrDatabaseString(row, 'worktree_branch')
@@ -69,6 +71,9 @@ export function readJrCard(db: SyncDatabase, row: JrDatabaseRow): JrCard {
     status: requireJrDatabaseCardStatus(row),
     harness: harnessValue && isJrHarness(harnessValue) ? harnessValue : null,
     model,
+    reviewHarness:
+      reviewHarnessValue && isJrHarness(reviewHarnessValue) ? reviewHarnessValue : null,
+    reviewModel,
     execution: {
       repositoryId: optionalJrDatabaseString(row, 'repository_id'),
       baseRef: optionalJrDatabaseString(row, 'base_ref'),
@@ -108,6 +113,15 @@ export function readJrCard(db: SyncDatabase, row: JrDatabaseRow): JrCard {
     artifacts: listJrCardArtifacts(db, id),
     events: listJrCardEvents(db, id)
   }
+}
+
+function readJrModelChoice(
+  modelId: string | null,
+  modelLabel: string | null
+): JrModelChoice | null {
+  return modelId && modelLabel
+    ? { id: modelId, label: modelLabel, capabilitySource: 'orca-session-catalog' }
+    : null
 }
 
 export function upsertJrArtifact(

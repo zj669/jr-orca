@@ -106,6 +106,11 @@ describe('JrStore', () => {
       { harness: 'gemini', modelId: 'gemini-3-pro-preview' },
       controller
     )
+    store.updateCardReviewConfiguration(
+      card.id,
+      { harness: 'claude', modelId: 'sonnet' },
+      controller
+    )
     store.updateCardExecutionTarget(
       card.id,
       { repositoryId: 'repo-1', baseRef: 'main', setupDecision: 'inherit' },
@@ -123,6 +128,8 @@ describe('JrStore', () => {
     expect(restored).toMatchObject({
       harness: 'gemini',
       model: { id: 'gemini-3-pro-preview' },
+      reviewHarness: 'claude',
+      reviewModel: { id: 'sonnet' },
       status: 'planning'
     })
     expect(restored?.artifacts.map((artifact) => artifact.path)).toEqual(
@@ -241,6 +248,62 @@ describe('JrStore', () => {
     )
   })
 
+  it('requires an explicit review AI and relaunches execution in the original worktree', async () => {
+    const store = await createStore()
+    const card = await reachExecuting(store, 'Review findings return to execution')
+
+    expect(() => store.prepareReviewLaunch(card.id, controller)).toThrow(
+      '请先选择审查 AI，或明确使用与执行相同的配置。'
+    )
+
+    const configured = store.updateCardReviewConfiguration(
+      card.id,
+      { harness: 'claude', modelId: 'sonnet' },
+      controller
+    )
+    expect(configured).toMatchObject({
+      harness: 'cursorcli',
+      model: { id: 'auto' },
+      reviewHarness: 'claude',
+      reviewModel: { id: 'sonnet' }
+    })
+
+    const reviewLaunch = store.prepareReviewLaunch(card.id, controller)
+    expect(reviewLaunch).toMatchObject({
+      harness: 'claude',
+      model: { id: 'sonnet' },
+      worktree: card.execution.worktree
+    })
+    expect(reviewLaunch.prompt).toContain('jr-trellis-check')
+
+    store.requestReview(card.id, jrReviewSnapshot(card), controller)
+    store.writeArtifact(
+      card.id,
+      `tasks/${card.id}/review.md`,
+      '# Review findings\n\n- Add input validation before delivery.\n',
+      { kind: 'task-agent', id: 'reviewer' }
+    )
+    const changedReview = store.updateCardReviewConfiguration(
+      card.id,
+      { harness: 'codex', modelId: 'gpt-5.6-sol' },
+      controller
+    )
+    expect(changedReview.reviewHarness).toBe('codex')
+
+    const executing = store.returnToExecution(card.id, controller)
+    const relaunch = store.prepareExecutionRelaunch(card.id, controller)
+    expect(executing.status).toBe('executing')
+    expect(relaunch).toMatchObject({
+      harness: 'cursorcli',
+      model: { id: 'auto' },
+      worktree: card.execution.worktree
+    })
+    expect(relaunch.prompt).toContain('Add input validation before delivery.')
+    expect(() =>
+      store.updateCardConfiguration(card.id, { harness: 'claude', modelId: 'sonnet' }, controller)
+    ).toThrow('执行批准后不能修改 harness 或模型')
+  })
+
   it('retries prepareShip after a blocked shipping merge and can return to execution', async () => {
     const store = await createStore()
     const card = await reachExecuting(store, 'Retry local merge')
@@ -253,7 +316,11 @@ describe('JrStore', () => {
     const firstShip = store.prepareShip(card.id, controller)
     expect(firstShip.baseRef).toBe('main')
 
-    const blocked = store.blockExecution(card.id, 'untracked files would be overwritten', controller)
+    const blocked = store.blockExecution(
+      card.id,
+      'untracked files would be overwritten',
+      controller
+    )
     expect(blocked.status).toBe('blocked')
     expect(blocked.blocked?.fromStatus).toBe('shipping')
 
