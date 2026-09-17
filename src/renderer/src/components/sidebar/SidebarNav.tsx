@@ -10,6 +10,7 @@ import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { SetupGuideSidebarEntry } from './SetupGuideSidebarEntry'
+import { SidebarJrBoardNavButton } from './SidebarJrBoardNavButton'
 import { SidebarTaskNavButton } from './SidebarTaskNavButton'
 import { HideSidebarMenu } from './sidebar-nav-controls'
 import { translate } from '@/i18n/i18n'
@@ -50,7 +51,17 @@ export function shouldShowAgentDashboardButton(
 
 const AgentDashboardSidebarEntry = lazyWithRetry(() => import('./AgentDashboardSidebarEntry'))
 
-const SidebarNav = React.memo(function SidebarNav() {
+type SidebarNavProps = {
+  jrBoardOpen?: boolean
+  onJrBoardToggle?: () => void
+}
+
+const noop = (): void => undefined
+
+const SidebarNav = React.memo(function SidebarNav({
+  jrBoardOpen = false,
+  onJrBoardToggle = noop
+}: SidebarNavProps) {
   // Why: this memo boundary needs its own language subscription, while
   // translate() preserves Orca's pseudo-localization behavior.
   useTranslation()
@@ -121,6 +132,7 @@ const SidebarNav = React.memo(function SidebarNav() {
       </button>
       <SetupGuideSidebarEntry />
       <SidebarTaskNavButton />
+      <SidebarJrBoardNavButton open={jrBoardOpen} onToggle={onJrBoardToggle} />
       {showArtifactsButton ? (
         <ContextMenu>
           <ContextMenuTrigger asChild>

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { CircleDot, Loader2, Plus } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -10,34 +11,13 @@ import {
   SheetTitle
 } from '@/components/ui/sheet'
 import { JrCardDetail } from '@/components/jr/JrCardDetail'
+import { JR_BOARD_COLUMNS, jrCardBoardColumn } from '@/components/jr/jr-board-columns'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
+import { jrStatusLabel } from '../../../../shared/jr/jr-status-labels'
 import type { JrBoardSnapshot, JrCard, JrControllerActor } from '../../../../shared/jr/jr-types'
 
 const LOCAL_CONTROLLER: JrControllerActor = { kind: 'human-controller', id: 'local-user' }
-
-const LANES: readonly { status: JrCard['status']; label: string; description: string }[] = [
-  { status: 'idea', label: '想法', description: '尚未授权 AI' },
-  { status: 'discussion', label: '讨论中', description: '无代码写入' },
-  { status: 'planning', label: '规划中', description: '同一 harness' },
-  {
-    status: 'pending_execution_approval',
-    label: '待批准执行',
-    description: '契约已冻结'
-  },
-  { status: 'creating_worktree', label: '创建工作树', description: 'Orca Create' },
-  { status: 'executing', label: '执行中', description: 'Orca Work' },
-  { status: 'verifying', label: '验证中', description: 'Orca Review' },
-  {
-    status: 'pending_merge_approval',
-    label: '待批准合并',
-    description: '等待 controller'
-  },
-  { status: 'shipping', label: '交付中', description: 'Orca Ship' },
-  { status: 'merged', label: '已合并', description: 'Trellis Finish' },
-  { status: 'blocked', label: '受阻', description: '负责人与原因' },
-  { status: 'cancelled', label: '已取消', description: '不再推进' }
-]
 
 type JrBoardDrawerProps = {
   open: boolean
@@ -79,6 +59,9 @@ export default function JrBoardDrawer({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const repositories = useAppStore((state) => state.repos)
+  const sidebarOpen = useAppStore((state) => state.sidebarOpen)
+  const sidebarWidth = useAppStore((state) => state.sidebarWidth)
+  const drawerLeft = sidebarOpen ? `var(--workspace-sidebar-live-width, ${sidebarWidth}px)` : '0px'
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -128,12 +111,22 @@ export default function JrBoardDrawer({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetContent
-        side="right"
-        className="flex h-full w-full flex-col overflow-hidden p-0 sm:max-w-[min(96vw,72rem)]"
+        side="left"
+        className="h-auto w-full max-w-none overflow-hidden border-r bg-background p-0 sm:max-w-none"
         data-jr-board=""
+        overlayClassName="pointer-events-none bg-transparent backdrop-blur-none"
+        style={{
+          left: drawerLeft,
+          top: '36px',
+          bottom: '0px',
+          height: 'auto',
+          width: `min(calc(100vw - ${drawerLeft}), 1280px)`
+        }}
         onOpenAutoFocus={(event) => event.preventDefault()}
+        onPointerDownOutside={(event) => event.preventDefault()}
+        onInteractOutside={(event) => event.preventDefault()}
       >
         <SheetHeader className="border-b px-5 py-4 pr-14">
           <SheetTitle className="flex items-center gap-2">
@@ -141,8 +134,7 @@ export default function JrBoardDrawer({
             JR 交付看板
           </SheetTitle>
           <SheetDescription>
-            Trellis 数据保存在本地 JR 数据库；只有 controller 能批准执行和合并。Agent 不能写
-            .trellis/。
+            卡片和工件保存在本地 JR 数据库；执行与合并由控制者批准。
           </SheetDescription>
         </SheetHeader>
 
@@ -186,29 +178,31 @@ export default function JrBoardDrawer({
 
             {snapshot ? (
               <>
-                <div className="shrink-0 overflow-x-auto border-b scrollbar-sleek">
-                  <div className="flex w-max gap-3 p-4">
-                    {LANES.map((lane) => {
-                      const cards = snapshot.cards.filter((card) => card.status === lane.status)
+                <div className="min-h-0 flex-[0.9] overflow-x-auto overflow-y-hidden border-b scrollbar-sleek">
+                  <div className="flex h-full min-w-max gap-4 p-4">
+                    {JR_BOARD_COLUMNS.map((column) => {
+                      const cards = snapshot.cards.filter(
+                        (card) => jrCardBoardColumn(card) === column.id
+                      )
                       return (
                         <section
-                          key={lane.status}
-                          className="flex max-h-64 min-h-40 w-52 shrink-0 flex-col rounded-xl border bg-card p-3 text-card-foreground"
-                          aria-label={lane.label}
-                          data-jr-lane={lane.status}
+                          key={column.id}
+                          className="flex h-full min-h-64 w-60 shrink-0 flex-col rounded-xl border bg-card p-3 text-card-foreground shadow-xs"
+                          aria-label={column.label}
+                          data-jr-lane={column.id}
                         >
                           <div className="mb-3 flex items-center justify-between gap-2">
                             <div className="min-w-0">
                               <h3 className="whitespace-nowrap text-sm font-semibold">
-                                {lane.label}
+                                {column.label}
                               </h3>
                               <p className="mt-0.5 whitespace-nowrap text-xs text-muted-foreground">
-                                {lane.description}
+                                {column.description}
                               </p>
                             </div>
-                            <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                            <Badge variant="secondary" className="px-2 text-xs font-medium">
                               {cards.length}
-                            </span>
+                            </Badge>
                           </div>
                           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto scrollbar-sleek">
                             {cards.map((card) => (
@@ -218,11 +212,21 @@ export default function JrBoardDrawer({
                                 onClick={() => setSelectedId(card.id)}
                                 className={cn(
                                   'w-full rounded-lg border bg-background p-3 text-left shadow-xs transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden',
-                                  selectedCard?.id === card.id && 'border-ring'
+                                  selectedCard?.id === card.id && 'border-ring bg-accent/40'
                                 )}
+                                aria-pressed={selectedCard?.id === card.id}
+                                data-jr-card-id={card.id}
                               >
-                                <div className="line-clamp-2 break-keep text-sm font-medium">
-                                  {card.title}
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="line-clamp-2 break-keep text-sm font-medium">
+                                    {card.title}
+                                  </div>
+                                  <Badge
+                                    variant={card.blocked ? 'destructive' : 'outline'}
+                                    className="max-w-24 truncate"
+                                  >
+                                    {card.blocked ? '受阻' : jrStatusLabel(card.status)}
+                                  </Badge>
                                 </div>
                                 <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
                                   <span className="min-w-0 truncate">
@@ -234,8 +238,8 @@ export default function JrBoardDrawer({
                                   </span>
                                 </div>
                                 {card.blocked ? (
-                                  <p className="mt-1 line-clamp-2 break-keep text-xs text-destructive">
-                                    {card.blocked.reason}
+                                  <p className="mt-2 line-clamp-2 break-keep text-xs text-destructive">
+                                    受阻：{card.blocked.reason}
                                   </p>
                                 ) : null}
                                 {worktreeStatusDescription(card) ? (
@@ -257,7 +261,7 @@ export default function JrBoardDrawer({
                   </div>
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-8 scrollbar-sleek">
+                <div className="min-h-0 flex-[1.1] overflow-y-auto bg-muted/20 p-4 pb-8 scrollbar-sleek">
                   {selectedCard ? (
                     <JrCardDetail
                       card={selectedCard}

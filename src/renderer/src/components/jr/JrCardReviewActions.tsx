@@ -31,15 +31,15 @@ export function JrCardReviewActions({
     <div className="mt-4 space-y-3">
       {card.review ? (
         <p className="text-xs text-muted-foreground">
-          {card.review.changedFiles} 个文件 · ahead {card.review.commitsAhead} · uncommitted{' '}
-          {card.review.uncommittedFiles}
+          {card.review.changedFiles} 个文件 · 领先 {card.review.commitsAhead} 个提交 · 未提交{' '}
+          {card.review.uncommittedFiles} 个文件
           {card.review.conflicted ? ' · 有冲突' : ''}
         </p>
       ) : null}
       {card.delivery ? (
         <p className="text-sm font-medium">
           {card.delivery.method === 'hosted-pr'
-            ? `已合并 hosted PR ${card.delivery.prNumber} 到 ${card.delivery.mergedInto}`
+            ? `已合并托管 PR ${card.delivery.prNumber} 到 ${card.delivery.mergedInto}`
             : card.delivery.method === 'folder-workspace'
               ? `文件夹工作区已交付到 ${card.delivery.mergedInto}`
               : `已在基础 worktree 合并到 ${card.delivery.mergedInto}`}

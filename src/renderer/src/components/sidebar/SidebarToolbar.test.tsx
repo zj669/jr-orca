@@ -54,9 +54,7 @@ async function renderToolbar(onWorkspaceBoardToggle = vi.fn()): Promise<{
     await act(async () => {
       root.render(
         <SidebarToolbar
-          jrBoardOpen={false}
           workspaceBoardOpen={false}
-          onJrBoardToggle={() => undefined}
           onWorkspaceBoardToggle={onWorkspaceBoardToggle}
         />
       )

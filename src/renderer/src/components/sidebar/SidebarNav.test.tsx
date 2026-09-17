@@ -152,7 +152,13 @@ function setSidebarState({
 
 const mountedRoots: Root[] = []
 
-async function renderSidebarNav(): Promise<HTMLDivElement> {
+async function renderSidebarNav({
+  jrBoardOpen = false,
+  onJrBoardToggle = vi.fn()
+}: {
+  jrBoardOpen?: boolean
+  onJrBoardToggle?: () => void
+} = {}): Promise<HTMLDivElement> {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -160,7 +166,7 @@ async function renderSidebarNav(): Promise<HTMLDivElement> {
   await act(async () => {
     root.render(
       <TooltipProvider>
-        <SidebarNav />
+        <SidebarNav jrBoardOpen={jrBoardOpen} onJrBoardToggle={onJrBoardToggle} />
       </TooltipProvider>
     )
   })
@@ -216,6 +222,27 @@ describe('SidebarNav', () => {
     mocks.hasPairedMobileDevice = false
     mocks.agentBucketCounts = { attention: 0, working: 0, done: 0, idle: 0 }
     setSidebarState()
+  })
+
+  it('places JR delivery beside Tasks and Automations', async () => {
+    const onJrBoardToggle = vi.fn()
+    const container = await renderSidebarNav({ onJrBoardToggle })
+    const taskIndex = Array.from(container.querySelectorAll('button')).indexOf(
+      getButtonByText(container, 'Tasks')
+    )
+    const jrButton = getButtonByText(container, 'JR 交付')
+    const automationIndex = Array.from(container.querySelectorAll('button')).indexOf(
+      getButtonByText(container, 'Automations')
+    )
+
+    expect(taskIndex).toBeLessThan(
+      Array.from(container.querySelectorAll('button')).indexOf(jrButton)
+    )
+    expect(automationIndex).toBeGreaterThan(
+      Array.from(container.querySelectorAll('button')).indexOf(jrButton)
+    )
+    await clickButton(jrButton)
+    expect(onJrBoardToggle).toHaveBeenCalledOnce()
   })
 
   it('keeps the Agent Dashboard row unmounted while its experiment is off', async () => {

@@ -151,13 +151,13 @@ export function JrCardDetail({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-            Controller 视图
+            控制者视图
           </p>
           <h3 className="mt-1 text-base font-semibold">{card.title}</h3>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{card.description}</p>
         </div>
         <span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
-          {card.artifacts.length} 个 DB artifacts
+          {card.artifacts.length} 个数据库工件
         </span>
       </div>
 
@@ -265,9 +265,7 @@ export function JrCardDetail({
 
       {card.artifacts.length > 0 ? (
         <details className="mt-4 border-t pt-4">
-          <summary className="cursor-pointer text-sm font-medium">
-            查看 DB-backed Trellis artifacts
-          </summary>
+          <summary className="cursor-pointer text-sm font-medium">查看 Trellis 数据库工件</summary>
           <div className="mt-3 space-y-2">
             {card.artifacts.map((artifact) => (
               <div key={artifact.id} className="rounded-md border bg-muted/30 p-2">
@@ -293,16 +291,16 @@ function isSetupDecision(value: string): value is 'inherit' | 'run' | 'skip' {
 
 function statusMessage(status: JrCard['status']): string {
   if (status === 'creating_worktree') {
-    return 'Orca 正在创建 worktree。'
+    return 'Orca 正在创建工作树。'
   }
   if (status === 'executing') {
-    return 'Harness 已启动。退出后会自动进入验证。'
+    return 'AI 会话已启动。退出后会自动进入验证。'
   }
   if (status === 'verifying') {
     return '正在使用 Orca Review 核对 diff。'
   }
   if (status === 'pending_merge_approval') {
-    return '等待 controller 批准合并。'
+    return '等待控制者批准合并。'
   }
   if (status === 'shipping') {
     return '正在通过 Orca 推送并合并。'
@@ -313,5 +311,5 @@ function statusMessage(status: JrCard['status']): string {
   if (status === 'cancelled') {
     return '卡片已取消。'
   }
-  return '该卡片当前没有可用的 controller 操作。'
+  return '该卡片当前没有可用的控制者操作。'
 }

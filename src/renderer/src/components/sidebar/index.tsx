@@ -176,7 +176,7 @@ function Sidebar({
         {sidebarOpen && (
           <>
             {/* Fixed controls */}
-            <SidebarNav />
+            <SidebarNav jrBoardOpen={jrBoardOpen} onJrBoardToggle={toggleJrBoard} />
             <SidebarHeader
               onWorkspaceBoardMenuOpenChange={setWorkspaceBoardMenuOpen}
               activityOptionsTarget={setAgentOptionsTarget}
@@ -212,10 +212,8 @@ function Sidebar({
 
               {/* Fixed bottom toolbar */}
               <SidebarToolbar
-                jrBoardOpen={jrBoardOpen}
                 workspaceBoardOpen={workspaceBoardOpen}
                 workspaceBoardDragPreviewOpen={workspaceBoardDragPreviewOpen}
-                onJrBoardToggle={toggleJrBoard}
                 onWorkspaceBoardToggle={toggleWorkspaceBoardWithJrClosed}
               />
             </div>
