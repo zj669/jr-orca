@@ -95,7 +95,6 @@ const SidebarToolbar = React.memo(function SidebarToolbar({
                 data-workspace-board-trigger=""
                 data-workspace-board-preview={workspaceBoardDragPreviewOpen ? 'true' : undefined}
                 onClick={handleWorkspaceBoardClick}
-                className="text-muted-foreground"
               >
                 <Kanban className="size-3.5" />
               </Button>

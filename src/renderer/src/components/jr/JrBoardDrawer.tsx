@@ -114,29 +114,33 @@ export default function JrBoardDrawer({
     <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetContent
         side="left"
-        className="h-auto w-full max-w-none overflow-hidden border-r bg-background p-0 sm:max-w-none"
         data-jr-board=""
-        overlayClassName="pointer-events-none bg-transparent backdrop-blur-none"
+        overlayStyle={{ pointerEvents: 'none', opacity: 0 }}
         style={{
           left: drawerLeft,
           top: '36px',
           bottom: '0px',
           height: 'auto',
-          width: `min(calc(100vw - ${drawerLeft}), 1280px)`
+          width: `min(calc(100vw - ${drawerLeft}), 1280px)`,
+          maxWidth: 'none'
         }}
         onOpenAutoFocus={(event) => event.preventDefault()}
         onPointerDownOutside={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
       >
-        <SheetHeader className="border-b px-5 py-4 pr-14">
-          <SheetTitle className="flex items-center gap-2">
-            <CircleDot className="size-4 text-muted-foreground" />
-            JR 交付看板
-          </SheetTitle>
-          <SheetDescription>
-            卡片和工件保存在本地 JR 数据库；执行与合并由控制者批准。
-          </SheetDescription>
-        </SheetHeader>
+        <div className="border-b">
+          <SheetHeader>
+            <SheetTitle>
+              <span className="flex items-center gap-2">
+                <CircleDot className="size-4 text-muted-foreground" />
+                JR 交付看板
+              </span>
+            </SheetTitle>
+            <SheetDescription>
+              卡片和工件保存在本地 JR 数据库；执行与合并由控制者批准。
+            </SheetDescription>
+          </SheetHeader>
+        </div>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <form className="border-b p-4" onSubmit={handleCreate}>
@@ -200,9 +204,7 @@ export default function JrBoardDrawer({
                                 {column.description}
                               </p>
                             </div>
-                            <Badge variant="secondary" className="px-2 text-xs font-medium">
-                              {cards.length}
-                            </Badge>
+                            <Badge variant="secondary">{cards.length}</Badge>
                           </div>
                           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto scrollbar-sleek">
                             {cards.map((card) => (
@@ -221,10 +223,7 @@ export default function JrBoardDrawer({
                                   <div className="line-clamp-2 break-keep text-sm font-medium">
                                     {card.title}
                                   </div>
-                                  <Badge
-                                    variant={card.blocked ? 'destructive' : 'outline'}
-                                    className="max-w-24 truncate"
-                                  >
+                                  <Badge variant={card.blocked ? 'destructive' : 'outline'}>
                                     {card.blocked ? '受阻' : jrStatusLabel(card.status)}
                                   </Badge>
                                 </div>
