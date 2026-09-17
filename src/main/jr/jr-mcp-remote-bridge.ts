@@ -77,11 +77,7 @@ function extractOne() {
 }
 
 function encode(message) {
-  const json = JSON.stringify(message)
-  return Buffer.concat([
-    Buffer.from('Content-Length: ' + Buffer.byteLength(json, 'utf8') + '\\r\\n\\r\\n', 'utf8'),
-    Buffer.from(json, 'utf8')
-  ])
+  return Buffer.from(JSON.stringify(message) + '\\n', 'utf8')
 }
 
 function handle(raw) {

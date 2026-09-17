@@ -34,7 +34,12 @@ export function startJrMcpStdioFromEnv(
       })
     }
   })
+  let closed = false
   const close = (): void => {
+    if (closed) {
+      return
+    }
+    closed = true
     store.close()
   }
   stdin.on('end', close)

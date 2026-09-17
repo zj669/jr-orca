@@ -15,7 +15,7 @@ export class JrMcpStdioBuffer {
     }
   }
 
-  private extractOne(): unknown | undefined {
+  private extractOne(): unknown {
     if (this.pending.length === 0) {
       return undefined
     }
@@ -52,9 +52,7 @@ export class JrMcpStdioBuffer {
 }
 
 export function encodeJrMcpMessage(message: unknown): Buffer {
-  const json = JSON.stringify(message)
-  const header = `Content-Length: ${Buffer.byteLength(json, 'utf8')}\r\n\r\n`
-  return Buffer.concat([Buffer.from(header, 'utf8'), Buffer.from(json, 'utf8')])
+  return Buffer.from(`${JSON.stringify(message)}\n`, 'utf8')
 }
 
 function indexOfHeaderDelimiter(buffer: Buffer): number {

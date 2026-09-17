@@ -101,8 +101,20 @@ describe('JR MCP protocol', () => {
     })
   })
 
-  it('frames JSON-RPC messages with Content-Length', () => {
-    const encoded = encodeJrMcpMessage({ jsonrpc: '2.0', id: 1, result: { ok: true } })
+  it('frames JSON-RPC messages as newline-delimited JSON', () => {
+    const message = { jsonrpc: '2.0', id: 1, result: { ok: true } }
+    const encoded = encodeJrMcpMessage(message)
+    expect(encoded.toString('utf8')).toBe(`${JSON.stringify(message)}\n`)
+    expect(new JrMcpStdioBuffer().push(encoded)).toEqual([
+      { jsonrpc: '2.0', id: 1, result: { ok: true } }
+    ])
+  })
+
+  it('accepts legacy Content-Length framed input', () => {
+    const message = JSON.stringify({ jsonrpc: '2.0', id: 1, result: { ok: true } })
+    const encoded = Buffer.from(
+      `Content-Length: ${Buffer.byteLength(message, 'utf8')}\r\n\r\n${message}`
+    )
     expect(new JrMcpStdioBuffer().push(encoded)).toEqual([
       { jsonrpc: '2.0', id: 1, result: { ok: true } }
     ])
