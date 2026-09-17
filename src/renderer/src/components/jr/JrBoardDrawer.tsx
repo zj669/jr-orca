@@ -179,7 +179,7 @@ export default function JrBoardDrawer({
             {snapshot ? (
               <>
                 <div className="min-h-0 flex-[0.9] overflow-x-auto overflow-y-hidden border-b scrollbar-sleek">
-                  <div className="flex h-full min-w-max gap-4 p-4">
+                  <div className="grid h-full min-w-240 grid-cols-5 gap-4 p-4">
                     {JR_BOARD_COLUMNS.map((column) => {
                       const cards = snapshot.cards.filter(
                         (card) => jrCardBoardColumn(card) === column.id
@@ -187,7 +187,7 @@ export default function JrBoardDrawer({
                       return (
                         <section
                           key={column.id}
-                          className="flex h-full min-h-64 w-60 shrink-0 flex-col rounded-xl border bg-card p-3 text-card-foreground shadow-xs"
+                          className="flex min-h-64 min-w-0 flex-col rounded-xl border bg-card p-3 text-card-foreground shadow-xs"
                           aria-label={column.label}
                           data-jr-lane={column.id}
                         >
