@@ -102,13 +102,15 @@ export function JrCardDetail({
     )
   }
   const handleUseExecutionForReview = (): void => {
-    if (!card.harness || !card.model) {
+    const harness = card.harness
+    const model = card.model
+    if (!harness || !model) {
       return
     }
     runAction(() =>
       window.api.jr.updateCardReviewConfiguration(
         card.id,
-        { harness: card.harness, modelId: card.model.id },
+        { harness, modelId: model.id },
         controller
       )
     )
