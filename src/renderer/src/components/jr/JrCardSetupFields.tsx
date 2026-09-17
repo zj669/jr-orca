@@ -64,9 +64,7 @@ export function JrCardSetupFields({
     <>
       <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2">
         <div className="space-y-1">
-          <Label htmlFor="jr-description" className="text-xs">
-            问题与预期结果
-          </Label>
+          <Label htmlFor="jr-description">问题与预期结果</Label>
           <Textarea
             key={`${card.id}:description:${card.updatedAt}`}
             id="jr-description"
@@ -78,9 +76,7 @@ export function JrCardSetupFields({
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="jr-acceptance" className="text-xs">
-            验收标准
-          </Label>
+          <Label htmlFor="jr-acceptance">验收标准</Label>
           <Textarea
             key={`${card.id}:acceptance:${card.updatedAt}`}
             id="jr-acceptance"
@@ -95,9 +91,7 @@ export function JrCardSetupFields({
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <div className="space-y-1">
-          <Label htmlFor="jr-priority" className="text-xs">
-            优先级
-          </Label>
+          <Label htmlFor="jr-priority">优先级</Label>
           <Select
             value={card.priority ?? undefined}
             onValueChange={(value) => {
@@ -123,9 +117,7 @@ export function JrCardSetupFields({
 
       <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="jr-execution-harness" className="text-xs">
-            执行 AI
-          </Label>
+          <Label htmlFor="jr-execution-harness">执行 AI</Label>
           <Select
             value={card.harness ?? undefined}
             onValueChange={onHarnessChange}
@@ -165,14 +157,11 @@ export function JrCardSetupFields({
         </div>
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <Label htmlFor="jr-review-harness" className="text-xs">
-              审查 AI
-            </Label>
+            <Label htmlFor="jr-review-harness">审查 AI</Label>
             <Button
               type="button"
               variant="link"
               size="xs"
-              className="h-auto px-0"
               onClick={onUseExecutionForReview}
               disabled={reviewLocked || !card.harness || !card.model}
             >
