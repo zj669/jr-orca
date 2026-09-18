@@ -80,16 +80,11 @@ export function JrCardDetail({
   }
   const handleReviewHarnessChange = (harness: string): void => {
     const option = harnesses.find((item) => item.id === harness)
-    const defaultModel = option?.models[0]
-    if (!option || !defaultModel) {
+    if (!option) {
       return
     }
     runAction(() =>
-      window.api.jr.updateCardReviewConfiguration(
-        card.id,
-        { harness: option.id, modelId: defaultModel.id },
-        controller
-      )
+      window.api.jr.updateCardReviewConfiguration(card.id, { harness: option.id }, controller)
     )
   }
   const handleReviewModelChange = (modelId: string): void => {

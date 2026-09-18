@@ -14,6 +14,7 @@ import {
   parseJrExecutionTargetInput,
   parseJrExitCode,
   parseJrMergeIntoBaseInput,
+  parseJrReviewConfigurationInput,
   parseJrReviewSnapshot,
   parseJrWorktreeInput,
   requireJrIpcString
@@ -67,7 +68,7 @@ export function registerJrHandlers(store: JrHandlerStore = getJrStore()): void {
     (_event, cardId: unknown, rawInput: unknown, rawActor: unknown) =>
       store.updateCardReviewConfiguration(
         requireJrIpcString(cardId, 'card id'),
-        parseJrConfigurationInput(rawInput),
+        parseJrReviewConfigurationInput(rawInput),
         parseJrControllerActor(rawActor)
       )
   )

@@ -15,7 +15,8 @@ import {
   type JrReviewSnapshot,
   type JrUpdateCardDetailsInput,
   type JrUpdateCardInput,
-  type JrUpdateExecutionTargetInput
+  type JrUpdateExecutionTargetInput,
+  type JrUpdateReviewConfigurationInput
 } from '../../shared/jr/jr-types'
 
 export function isJrIpcRecord(value: unknown): value is Record<string, unknown> {
@@ -61,6 +62,19 @@ export function parseJrConfigurationInput(value: unknown): JrUpdateCardInput {
   return {
     harness: value.harness,
     modelId: requireJrIpcString(value.modelId, 'model id')
+  }
+}
+
+export function parseJrReviewConfigurationInput(value: unknown): JrUpdateReviewConfigurationInput {
+  if (!isJrIpcRecord(value) || !isJrHarness(value.harness)) {
+    throw new Error('JR Phase 1 review harness is required.')
+  }
+  if (value.modelId === undefined) {
+    return { harness: value.harness }
+  }
+  return {
+    harness: value.harness,
+    modelId: requireJrIpcString(value.modelId, 'review model id')
   }
 }
 

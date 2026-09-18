@@ -256,6 +256,16 @@ describe('JrStore', () => {
       '请先选择审查 AI，或明确使用与执行相同的配置。'
     )
 
+    const incompleteReview = store.updateCardReviewConfiguration(
+      card.id,
+      { harness: 'claude' },
+      controller
+    )
+    expect(incompleteReview).toMatchObject({ reviewHarness: 'claude', reviewModel: null })
+    expect(() => store.prepareReviewLaunch(card.id, controller)).toThrow(
+      '请先选择审查 AI，或明确使用与执行相同的配置。'
+    )
+
     const configured = store.updateCardReviewConfiguration(
       card.id,
       { harness: 'claude', modelId: 'sonnet' },

@@ -194,7 +194,10 @@ export type JrUpdateCardInput = {
   modelId: string
 }
 
-export type JrUpdateReviewConfigurationInput = JrUpdateCardInput
+export type JrUpdateReviewConfigurationInput = {
+  harness: JrHarness
+  modelId?: string
+}
 
 export type JrUpdateExecutionTargetInput = {
   repositoryId: string
