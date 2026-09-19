@@ -43,6 +43,17 @@ test('initializes a Git repository and lists a created card', () => {
     )
     const response = JSON.parse(mcpOutput)
     assert.equal(response.result.tools[0].name, 'jr_card_create')
+
+    const mcpCard = JSON.parse(
+      JSON.parse(
+        runCli(
+          repository,
+          ['mcp'],
+          '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"jr_card_create","arguments":{"title":"从 MCP 创建卡片"}}}\n'
+        )
+      ).result.content[0].text
+    )
+    assert.equal(mcpCard.status, 'idea')
   } finally {
     rmSync(repository, { recursive: true, force: true })
   }

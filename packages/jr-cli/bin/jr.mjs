@@ -214,18 +214,20 @@ function mergeMcpJson(path) {
 }
 
 function installCodexMcpConfig(path) {
-  if (existsSync(path)) {
-    return { path, installed: false }
-  }
   mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(
-    path,
-    `[mcp_servers.jr]
+  const configuration = `[mcp_servers.jr]
 command = "npx"
 args = ["--no-install", "jr", "mcp"]
-`,
-    'utf8'
-  )
+`
+  if (existsSync(path)) {
+    const existing = readFileSync(path, 'utf8')
+    if (existing.includes('[mcp_servers.jr]')) {
+      return { path, installed: false }
+    }
+    writeFileSync(path, `${existing.trimEnd()}\n\n${configuration}`, 'utf8')
+    return { path, installed: true }
+  }
+  writeFileSync(path, configuration, 'utf8')
   return { path, installed: true }
 }
 
