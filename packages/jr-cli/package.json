@@ -1,0 +1,21 @@
+{
+  "name": "jr",
+  "version": "0.1.0",
+  "description": "Repository-local JR delivery workflow CLI",
+  "type": "module",
+  "bin": {
+    "jr": "./bin/jr.mjs"
+  },
+  "files": [
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "license": "MIT"
+}
