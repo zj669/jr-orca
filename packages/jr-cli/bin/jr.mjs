@@ -183,6 +183,18 @@ function initializeProject(root) {
   return { root, databasePath, mcpPaths, skillPaths }
 }
 
+function printInitResult(result) {
+  process.stdout.write(`已初始化 JR\n仓库：${result.root}\n数据库：${result.databasePath}\n`)
+  for (const configuration of result.mcpPaths) {
+    const action = configuration.installed ? '已写入' : '保留已有'
+    process.stdout.write(`MCP 配置：${action} ${configuration.path}\n`)
+  }
+  for (const skill of result.skillPaths) {
+    const action = skill.installed ? '已写入' : '保留已有'
+    process.stdout.write(`技能：${action} ${skill.path}\n`)
+  }
+}
+
 function mergeMcpJson(path) {
   const config = existsSync(path) ? readJson(path) : {}
   if (!isRecord(config)) {
